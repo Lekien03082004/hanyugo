@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hanyugo-v13';
+const CACHE_NAME = 'hanyugo-v14';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -12,10 +12,14 @@ const ASSETS_TO_CACHE = [
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE).catch((err) => {
-        console.warn('Some assets could not be pre-cached:', err);
-      });
+    caches.open(CACHE_NAME).then(async (cache) => {
+      for (const asset of ASSETS_TO_CACHE) {
+        try {
+          await cache.add(asset);
+        } catch (e) {
+          console.warn('Cache error for:', asset, e);
+        }
+      }
     })
   );
 });
@@ -39,9 +43,9 @@ self.addEventListener('fetch', (event) => {
   // Cache-First Strategy: Luôn trả về từ bộ nhớ đệm điện thoại ngay lập tức (0.05s)
   // Giúp ứng dụng mở tức thì khi tắt máy tính hoặc không có mạng!
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
+    caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       if (cachedResponse) {
-        // Cập nhật ngầm trong nền nếu máy tính đang mở, không làm chặn ứng dụng
+        // Cập nhật ngầm trong nền nếu có mạng, không làm chặn ứng dụng
         fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
@@ -57,11 +61,13 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         }
         return networkResponse;
-      }).catch(() => {
-        // Fallback về trang chủ nếu là trang điều hướng
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
+      }).catch(async () => {
+        // Fallback về trang chủ nếu mất mạng hoặc offline
+        if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+          const fallback = (await caches.match('./index.html')) || (await caches.match('./'));
+          if (fallback) return fallback;
         }
+        return new Response('Offline', { status: 503, statusText: 'Offline' });
       });
     })
   );
