@@ -295,6 +295,8 @@ function updateDeckDropdowns() {
 
   importTarget.innerHTML = decks.map(d => `<option value="${d}">${d}</option>`).join('');
   modalDeck.innerHTML = decks.map(d => `<option value="${d}">${d}</option>`).join('');
+
+  renderDeckManager();
 }
 
 function onSelectDeckChange() {
@@ -309,6 +311,16 @@ function applyDeckFilter() {
   } else {
     filteredWords = allWords.filter(w => (w.deck || 'Chưa phân loại') === currentDeck);
     document.getElementById('headerDeckSubtitle').textContent = `Bộ: ${currentDeck} • ${filteredWords.length} từ`;
+  }
+
+  // Hiện / ẩn nút xóa bộ ở thanh trên cùng
+  const btnDel = document.getElementById('btnDeleteCurrentDeck');
+  if (btnDel) {
+    if (currentDeck === 'all') {
+      btnDel.classList.add('hidden');
+    } else {
+      btnDel.classList.remove('hidden');
+    }
   }
 
   currentCharIndex = 0;
@@ -349,6 +361,103 @@ function saveNewDeck() {
   applyDeckFilter();
   closeCreateDeckModal();
   alert(`Đã tạo bộ từ mới: "${name}"!`);
+}
+
+function confirmDeleteCurrentDeck() {
+  if (currentDeck === 'all') return;
+  deleteDeckByName(currentDeck);
+}
+
+function deleteDeckByName(deckName) {
+  if (!deckName || deckName === 'all') return;
+
+  const wordsInDeck = allWords.filter(w => (w.deck || 'Chưa phân loại') === deckName);
+  const msg = `⚠️ XÁC NHẬN XÓA BỘ TỪ: "${deckName}"?\n\n- Bộ này hiện đang có ${wordsInDeck.length} từ vựng.\n- Khi xóa, toàn bộ ${wordsInDeck.length} từ này sẽ bị xóa khỏi kho từ vựng.\n\nBạn có chắc chắn muốn xóa không?`;
+
+  if (confirm(msg)) {
+    // Xóa toàn bộ từ thuộc bộ này
+    allWords = allWords.filter(w => (w.deck || 'Chưa phân loại') !== deckName);
+    saveWordsToStorage(currentLang, allWords);
+
+    // Xóa tên bộ khỏi danh sách decks
+    let decks = loadDecksFromStorage(currentLang);
+    decks = decks.filter(d => d !== deckName);
+    if (decks.length === 0) {
+      decks = [currentLang === 'zh' ? 'HSK 1' : 'Cơ bản'];
+    }
+    saveDecksToStorage(currentLang, decks);
+
+    currentDeck = 'all';
+    updateDeckDropdowns();
+    applyDeckFilter();
+    alert(`Đã xóa thành công bộ từ "${deckName}" và ${wordsInDeck.length} từ liên quan!`);
+  }
+}
+
+function clearAllWordsForCurrentLang() {
+  const langTitle = currentLang === 'zh' ? 'Tiếng Trung' : 'Tiếng Anh';
+  const count = allWords.length;
+  if (count === 0) {
+    alert(`Kho từ ${langTitle} hiện đang trống.`);
+    return;
+  }
+
+  const msg = `🚨 CẢNH BÁO QUAN TRỌNG 🚨\n\nBạn có chắc chắn muốn xóa TẤT CẢ ${count} từ vựng ${langTitle} trong kho không?\n\n(Thao tác này sẽ làm sạch hoàn toàn để bạn nạp bộ từ mới từ file Tab hoặc tạo từ mới từ đầu).`;
+
+  if (confirm(msg)) {
+    allWords = [];
+    saveWordsToStorage(currentLang, allWords);
+    currentDeck = 'all';
+    updateDeckDropdowns();
+    applyDeckFilter();
+    alert(`Đã xóa sạch toàn bộ từ vựng ${langTitle}! Bạn có thể nhập bộ từ mới.`);
+  }
+}
+
+function renderDeckManager() {
+  const container = document.getElementById('deckManagerList');
+  if (!container) return;
+
+  const decks = loadDecksFromStorage(currentLang);
+  const badge = document.getElementById('decksCountBadge');
+  if (badge) badge.textContent = `${decks.length} bộ từ`;
+
+  if (decks.length === 0) {
+    container.innerHTML = `<div class="p-3 text-center text-xs text-slate-400">Chưa có bộ từ vựng nào.</div>`;
+    return;
+  }
+
+  container.innerHTML = decks.map(d => {
+    const count = allWords.filter(w => (w.deck || 'Chưa phân loại') === d).length;
+    const isSelected = currentDeck === d;
+    return `
+      <div class="flex items-center justify-between p-3 rounded-2xl border ${isSelected ? 'bg-rose-50/50 border-red-200' : 'bg-slate-50 border-slate-200'} transition">
+        <div class="flex-1 min-w-0 pr-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold ${isSelected ? 'text-red-700' : 'text-slate-800'} truncate">📁 ${d}</span>
+            ${isSelected ? '<span class="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">Đang chọn</span>' : ''}
+          </div>
+          <div class="text-[11px] text-slate-500 mt-0.5 font-medium">${count} từ vựng</div>
+        </div>
+
+        <div class="flex items-center gap-1 shrink-0">
+          <button onclick="selectDeckFromManager('${escapeStr(d)}')" class="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition">
+            Xem
+          </button>
+          <button onclick="deleteDeckByName('${escapeStr(d)}')" class="p-1.5 text-slate-300 hover:text-red-600 hover:bg-rose-100 rounded-xl transition" title="Xóa cả bộ này">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function selectDeckFromManager(deckName) {
+  currentDeck = deckName;
+  updateDeckDropdowns();
+  applyDeckFilter();
+  switchTab('vocab');
 }
 
 // ==================== TAB NAVIGATION ====================
@@ -394,6 +503,8 @@ function switchTab(tabId) {
     renderFlashcard();
   } else if (tabId === 'vocab') {
     renderVocabList();
+  } else if (tabId === 'settings') {
+    renderDeckManager();
   }
 }
 

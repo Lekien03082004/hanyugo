@@ -137,6 +137,12 @@
       </select>
     </div>
 
+    <!-- Nút xóa bộ đang chọn -->
+    <button id="btnDeleteCurrentDeck" onclick="confirmDeleteCurrentDeck()" class="hidden px-2.5 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-bold text-rose-700 flex items-center gap-1 shrink-0 active:scale-95 transition" title="Xóa toàn bộ từ trong bộ này">
+      <span>🗑️</span>
+      <span>Xóa bộ</span>
+    </button>
+
     <button onclick="openCreateDeckModal()" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-bold text-red-700 flex items-center gap-1 shrink-0 active:scale-95 transition">
       <span>+</span>
       <span>Tạo bộ mới</span>
@@ -661,6 +667,25 @@
           </button>
           <button onclick="loadSampleStarter('en')" class="py-2.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-800 font-bold rounded-2xl text-xs border border-slate-200 transition">
             🇬🇧 Nạp mẫu Tiếng Anh
+          </button>
+        </div>
+      </div>
+
+      <!-- Quản Lý Bộ Từ Vựng -->
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-rose-100/70 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+            🗂️ Quản Lý Các Bộ Từ Vựng
+          </h2>
+          <span class="text-[10px] text-slate-400 font-semibold" id="decksCountBadge"></span>
+        </div>
+        
+        <div id="deckManagerList" class="space-y-2"></div>
+
+        <div class="pt-2 border-t border-slate-100">
+          <button onclick="clearAllWordsForCurrentLang()" class="w-full py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-red-700 font-bold rounded-2xl text-xs border border-rose-200 transition flex items-center justify-center gap-1.5 active:scale-95">
+            <span>⚠️</span>
+            <span>Xóa sạch toàn bộ từ vựng (Làm trống kho từ)</span>
           </button>
         </div>
       </div>
