@@ -637,43 +637,137 @@ function playFlashcardAudio() {
   playAudioVoice(item.word, currentLang, 1.0);
 }
 
-let isServerOnline = true;
+// ==================== HỆ THỐNG ÂM THANH CHUẨN GIỌNG BẮC KINH (BEIJING ACCENT) & ANDROID CHROME FIX ====================
+let availableSystemVoices = [];
+let activeUtterance = null; // Biến toàn cục giữ tham chiếu để chống Android Chrome Garbage Collection tự động ngắt tiếng
 
-function checkServerStatus() {
-  const host = window.location.hostname;
-  // Nếu đang chạy trên GitHub Pages hoặc Vercel, dùng giọng đọc của máy điện thoại ngay lập tức
-  if (host.includes('github.io') || host.includes('vercel.app')) {
-    isServerOnline = false;
-    return;
+function initSpeechVoices() {
+  if ('speechSynthesis' in window) {
+    try {
+      availableSystemVoices = window.speechSynthesis.getVoices() || [];
+      window.speechSynthesis.onvoiceschanged = () => {
+        try {
+          availableSystemVoices = window.speechSynthesis.getVoices() || [];
+        } catch (e) {}
+      };
+    } catch (e) {}
   }
-  if (typeof AbortController === 'undefined') return;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 600);
-  fetch('./index.html', { method: 'HEAD', signal: controller.signal })
-    .then(() => {
-      clearTimeout(timer);
-      isServerOnline = true;
-    })
-    .catch(() => {
-      clearTimeout(timer);
-      isServerOnline = false;
+}
+initSpeechVoices();
+
+// Bộ chọn giọng chuẩn Bắc Kinh (Mainland Beijing Putonghua)
+function findBestBeijingVoice() {
+  if (!availableSystemVoices || availableSystemVoices.length === 0) {
+    if ('speechSynthesis' in window) {
+      availableSystemVoices = window.speechSynthesis.getVoices() || [];
+    }
+  }
+  if (!availableSystemVoices || availableSystemVoices.length === 0) return null;
+
+  // 1. Lọc tất cả các giọng tiếng Trung Đại Lục (loại trừ Đài Loan zh-TW và Hồng Kông zh-HK / Quảng Đông)
+  const mainlandVoices = availableSystemVoices.filter(v => {
+    const l = (v.lang || '').toLowerCase().replace(/_/g, '-');
+    const n = (v.name || '').toLowerCase();
+    const isZh = l.startsWith('zh') || l.startsWith('cmn');
+    const isNotSouthern = !l.includes('tw') && !l.includes('hk') && !n.includes('taiwan') && !n.includes('cantonese') && !n.includes('hong kong');
+    return isZh && isNotSouthern;
+  });
+
+  if (mainlandVoices.length > 0) {
+    // Ưu tiên giọng Bắc Kinh tiêu chuẩn Google hoặc giọng tự nhiên
+    const best = mainlandVoices.find(v => {
+      const n = (v.name || '').toLowerCase();
+      return n.includes('google') || n.includes('beijing') || n.includes('普通话') || n.includes('ting-ting') || n.includes('natural');
     });
+    return best || mainlandVoices[0];
+  }
+
+  // 2. Dự phòng: bất kỳ giọng zh nào
+  return availableSystemVoices.find(v => (v.lang || '').toLowerCase().startsWith('zh')) || null;
 }
 
-// ==================== PHÁT ÂM TIẾNG TRUNG & TIẾNG ANH (CHỐNG DOUBLE-CLICK & HỖ TRỢ TẮT MÁY TÍNH) ====================
+function findBestEnglishVoice() {
+  if (!availableSystemVoices || availableSystemVoices.length === 0) {
+    if ('speechSynthesis' in window) {
+      availableSystemVoices = window.speechSynthesis.getVoices() || [];
+    }
+  }
+  if (!availableSystemVoices || availableSystemVoices.length === 0) return null;
+  return availableSystemVoices.find(v => (v.lang || '').toLowerCase().replace(/_/g, '-').startsWith('en-us')) ||
+         availableSystemVoices.find(v => (v.lang || '').toLowerCase().startsWith('en')) || null;
+}
+
+function speakWithNativeTTS(text, lang = currentLang, rate = 1.0) {
+  if (!('speechSynthesis' in window)) return;
+
+  const isZh = (lang === 'zh');
+  const targetLang = isZh ? 'zh-CN' : 'en-US';
+
+  // Sửa lỗi Android Chrome: nếu đang bị kẹt pause thì đánh thức lại
+  if (window.speechSynthesis.paused) {
+    window.speechSynthesis.resume();
+  }
+
+  // Nếu đang nói thì dừng để nói câu mới (nhưng chỉ cancel khi speaking để tránh lỗi triệt tiêu âm trên Android)
+  if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+  }
+
+  const utt = new SpeechSynthesisUtterance(text);
+  activeUtterance = utt; // Giữ tham chiếu sống
+
+  utt.lang = targetLang;
+  utt.rate = Math.max(0.7, Math.min(rate, 1.2));
+  utt.pitch = 1.0;
+  utt.volume = 1.0;
+
+  // Gán giọng Bắc Kinh chuẩn
+  const selectedVoice = isZh ? findBestBeijingVoice() : findBestEnglishVoice();
+  if (selectedVoice) {
+    utt.voice = selectedVoice;
+  }
+
+  utt.onend = () => {
+    if (activeUtterance === utt) activeUtterance = null;
+  };
+
+  utt.onerror = (e) => {
+    console.warn('[TTS Error]:', e);
+    if (activeUtterance === utt) activeUtterance = null;
+  };
+
+  try {
+    window.speechSynthesis.speak(utt);
+  } catch (err) {
+    console.warn('speak error:', err);
+  }
+}
+
+// Kiểm tra xem có đang mở trực tiếp từ máy tính (mạng LAN / localhost) không
+function isLocalPythonServerHost() {
+  const host = window.location.hostname;
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.startsWith('192.168.') ||
+    host.startsWith('10.') ||
+    host.startsWith('172.')
+  );
+}
+
+let isServerOnline = isLocalPythonServerHost();
+
 function playAudioVoice(text, lang = currentLang, rate = 1.0) {
   if (!text) return;
   const clean = text.replace(/<[^>]*>/g, '').trim();
   if (!clean) return;
 
-  // Chống double click: nếu người dùng bấm liên tiếp dưới 400ms thì bỏ qua
+  // Chống bấm liên thanh
   const now = Date.now();
-  if (now - lastAudioTapTimestamp < 400) {
-    return;
-  }
+  if (now - lastAudioTapTimestamp < 300) return;
   lastAudioTapTimestamp = now;
 
-  // Dừng mọi âm thanh hoặc giọng đọc đang phát trước đó để tránh trùng âm / giật tiếng
+  // Dừng âm thanh cũ nếu đang phát
   if (currentActiveAudioInstance) {
     try {
       currentActiveAudioInstance.pause();
@@ -681,92 +775,64 @@ function playAudioVoice(text, lang = currentLang, rate = 1.0) {
     } catch (e) {}
     currentActiveAudioInstance = null;
   }
-  if ('speechSynthesis' in window) {
-    try {
-      window.speechSynthesis.cancel();
-    } catch (e) {}
-  }
 
-  // NẾU MÁY TÍNH TẮT: Phát âm ngay lập tức bằng giọng đọc offline của điện thoại
-  if (!isServerOnline) {
-    fallbackSpeechSynthesis(clean, lang, rate);
+  const isZh = (lang === 'zh');
+  const targetLang = isZh ? 'zh-CN' : 'en-US';
+
+  // 1. NẾU ĐANG CHẠY TRÊN MÁY TÍNH CÓ PYTHON SERVER: Dùng endpoint /tts
+  if (isLocalPythonServerHost() && isServerOnline) {
+    const ttsUrl = `/tts?text=${encodeURIComponent(clean)}&lang=${isZh ? 'zh' : 'en'}`;
+    const player = new Audio();
+    currentActiveAudioInstance = player;
+    player.playbackRate = rate;
+    player.src = ttsUrl;
+    player.onerror = () => {
+      isServerOnline = false;
+      speakWithNativeTTS(clean, lang, rate);
+    };
+    player.play().catch(() => {
+      speakWithNativeTTS(clean, lang, rate);
+    });
     return;
   }
 
-  const langParam = lang === 'zh' ? 'zh' : 'en';
-  const ttsUrl = `/tts?text=${encodeURIComponent(clean)}&lang=${langParam}`;
-
-  const player = new Audio();
-  currentActiveAudioInstance = player;
-
-  // Bộ hẹn giờ cứu cánh: Nếu máy tính vừa tắt và không kết nối được sau 700ms -> Chuyển sang giọng offline
-  const safetyTimeout = setTimeout(() => {
-    if (player.readyState === 0) {
-      isServerOnline = false;
-      player.src = "";
-      if (currentActiveAudioInstance === player) {
-        currentActiveAudioInstance = null;
-      }
-      fallbackSpeechSynthesis(clean, lang, rate);
-    }
-  }, 750);
-
-  // Đảm bảo tốc độ phát được thiết lập đúng cả trên Mobile WebKit/Chrome
-  player.defaultPlaybackRate = rate;
-  player.playbackRate = rate;
-  player.src = ttsUrl;
-
-  player.onplay = () => {
-    clearTimeout(safetyTimeout);
-  };
-
-  player.onloadedmetadata = () => {
+  // 2. NẾU ĐANG CHẠY TRÊN GITHUB PAGES / ĐIỆN THOẠI (ONLINE):
+  // Thử phát âm thanh chuẩn Bắc Kinh qua stream Google TTS (chất lượng studio phát thanh)
+  if (navigator.onLine) {
+    const onlineUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(clean)}&tl=${targetLang}&client=tw-ob`;
+    const player = new Audio();
+    currentActiveAudioInstance = player;
     player.playbackRate = rate;
-  };
 
-  player.onended = () => {
-    clearTimeout(safetyTimeout);
-    if (currentActiveAudioInstance === player) {
-      currentActiveAudioInstance = null;
-    }
-  };
-
-  player.onerror = (e) => {
-    clearTimeout(safetyTimeout);
-    isServerOnline = false;
-    console.warn("Proxy audio error, trying Web Speech Synthesis fallback:", e);
-    if (currentActiveAudioInstance === player) {
-      currentActiveAudioInstance = null;
-    }
-    fallbackSpeechSynthesis(clean, lang, rate);
-  };
-
-  const p = player.play();
-  if (p !== undefined) {
-    p.catch((err) => {
-      clearTimeout(safetyTimeout);
-      console.warn("Audio play rejected, falling back to Web Speech Synthesis:", err);
-      if (currentActiveAudioInstance === player) {
-        currentActiveAudioInstance = null;
+    let hasAudioStarted = false;
+    // Cứu nguy: nếu mạng lag sau 650ms chưa kêu -> chuyển ngay sang giọng offline Bắc Kinh của máy
+    const fallbackTimer = setTimeout(() => {
+      if (!hasAudioStarted) {
+        speakWithNativeTTS(clean, lang, rate);
       }
-      fallbackSpeechSynthesis(clean, lang, rate);
+    }, 650);
+
+    player.onplay = () => {
+      hasAudioStarted = true;
+      clearTimeout(fallbackTimer);
+    };
+
+    player.onerror = () => {
+      clearTimeout(fallbackTimer);
+      speakWithNativeTTS(clean, lang, rate);
+    };
+
+    player.src = onlineUrl;
+    player.play().catch(() => {
+      clearTimeout(fallbackTimer);
+      speakWithNativeTTS(clean, lang, rate);
     });
+    return;
   }
-}
 
-function fallbackSpeechSynthesis(text, lang, rate) {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-
-  const utt = new SpeechSynthesisUtterance(text);
-  utt.rate = rate;
-  utt.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
-
-  const voices = window.speechSynthesis.getVoices();
-  const match = voices.find(v => v.lang.startsWith(lang === 'zh' ? 'zh' : 'en'));
-  if (match) utt.voice = match;
-
-  window.speechSynthesis.speak(utt);
+  // 3. NẾU OFFLINE HOÀN TOÀN (TẮT MẠNG / TẮT MÁY TÍNH):
+  // Dùng trực tiếp bộ máy giọng đọc chuẩn Bắc Kinh offline của điện thoại
+  speakWithNativeTTS(clean, lang, rate);
 }
 
 function speakCurrentWord() {
