@@ -529,10 +529,16 @@ function playFlashcardAudio() {
 let isServerOnline = true;
 
 function checkServerStatus() {
+  const host = window.location.hostname;
+  // Nếu đang chạy trên GitHub Pages hoặc Vercel, dùng giọng đọc của máy điện thoại ngay lập tức
+  if (host.includes('github.io') || host.includes('vercel.app')) {
+    isServerOnline = false;
+    return;
+  }
   if (typeof AbortController === 'undefined') return;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 600);
-  fetch('/index.html', { method: 'HEAD', signal: controller.signal })
+  fetch('./index.html', { method: 'HEAD', signal: controller.signal })
     .then(() => {
       clearTimeout(timer);
       isServerOnline = true;
