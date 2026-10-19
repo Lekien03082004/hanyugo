@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cài Đặt LinguaMaster Lên Điện Thoại</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
+  <div class="max-w-xl w-full bg-slate-800 border border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-6">
+    
+    <!-- Logo & Title -->
+    <div class="flex items-center justify-center gap-3">
+      <img src="./icon-192.png" alt="HanyuGo Logo" class="w-14 h-14 rounded-2xl shadow-lg border border-amber-300/40 object-contain">
+      <div class="text-left">
+        <h1 class="text-xl sm:text-2xl font-extrabold text-white">HanyuGo & English</h1>
+        <p class="text-xs text-rose-300 font-medium">Cài đặt ứng dụng lên điện thoại cá nhân</p>
+      </div>
+    </div>
+
+    <!-- QR Code Section -->
+    <div class="bg-white p-4 rounded-2xl inline-block shadow-lg border-4 border-blue-500/30">
+      <img id="qrImage" src="./qr_code.png" alt="QR Code" class="w-56 h-56 mx-auto object-contain"/>
+    </div>
+
+    <div>
+      <p class="text-xs text-slate-400 mb-1">Hoặc mở trình duyệt điện thoại truy cập trực tiếp địa chỉ:</p>
+      <a id="appUrlLink" href="#" target="_blank" class="inline-block bg-slate-900 px-4 py-2 rounded-xl text-blue-400 font-mono text-sm font-bold border border-slate-700 hover:text-blue-300">
+        http://192.168.1.203:8080
+      </a>
+    </div>
+
+    <!-- Step by Step Guide for Android & iPhone -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left text-xs">
+      
+      <!-- Android -->
+      <div class="bg-slate-900/80 p-4 rounded-2xl border border-slate-700/70 space-y-2">
+        <div class="flex items-center gap-2 font-bold text-emerald-400 text-sm">
+          <span>🤖</span>
+          <span>Dành cho máy Android</span>
+        </div>
+        <ol class="list-decimal list-inside space-y-1 text-slate-300 leading-relaxed">
+          <li>Bật camera điện thoại quét mã QR (hoặc mở trình duyệt <strong>Chrome</strong> gõ địa chỉ trên).</li>
+          <li>Khi vào app, bấm menu <strong>3 chấm (⋮)</strong> góc trên bên phải trình duyệt.</li>
+          <li>Chọn <strong>"Cài đặt ứng dụng"</strong> (hoặc "Thêm vào màn hình chính").</li>
+          <li>App sẽ xuất hiện ngoài màn hình chính như app tải từ CH Play!</li>
+        </ol>
+      </div>
+
+      <!-- iPhone -->
+      <div class="bg-slate-900/80 p-4 rounded-2xl border border-slate-700/70 space-y-2">
+        <div class="flex items-center gap-2 font-bold text-sky-400 text-sm">
+          <span>🍎</span>
+          <span>Dành cho máy iPhone</span>
+        </div>
+        <ol class="list-decimal list-inside space-y-1 text-slate-300 leading-relaxed">
+          <li>Bật camera quét mã QR (sẽ tự động mở bằng <strong>Safari</strong>).</li>
+          <li>Nhấn vào biểu tượng <strong>Chia sẻ (Share)</strong> ở thanh dưới (hình vuông có mũi tên trỏ lên).</li>
+          <li>Cuộn xuống chọn <strong>"Thêm vào MH chính" (Add to Home Screen)</strong>.</li>
+          <li>Nhấn <strong>Thêm (Add)</strong> ở góc trên bên phải. Xong!</li>
+        </ol>
+      </div>
+
+    </div>
+
+    <!-- Notice -->
+    <div class="p-3 bg-blue-950/40 rounded-xl border border-blue-800/50 text-[11px] text-blue-300 text-center">
+      💡 <strong>Lưu ý:</strong> Điện thoại và máy tính cần kết nối chung 1 mạng WiFi khi quét mã lần đầu. Sau khi đã cài đặt vào màn hình chính, app sẽ hoạt động <strong>Offline 100%</strong> mọi lúc mọi nơi kể cả khi tắt máy tính!
+    </div>
+
+  </div>
+
+  <script>
+    const currentOrigin = window.location.origin;
+    const appLink = document.getElementById('appUrlLink');
+    if (appLink) {
+      appLink.href = currentOrigin + '/index.html';
+      appLink.textContent = currentOrigin;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>HanyuGo & English - Học Ngoại Ngữ Cá Nhân</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#b91c1c">
+  <meta name="referrer" content="no-referrer">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="HanyuGo">
+  <link rel="icon" type="image/png" href="./icon-192.png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            hanyu: {
+              red: '#b91c1c',
+              darkred: '#991b1b',
+              lightred: '#fef2f2',
+              borderred: '#fecaca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #faf9f6;
+      overscroll-behavior-y: none;
+    }
+    .font-hanzi {
+      font-family: "Kaiti", "STKaiti", "KaiTi_GB2312", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", serif;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* 3D Flashcard flip */
+    .perspective-1000 {
+      perspective: 1000px;
+    }
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+      transform-style: preserve-3d;
+    }
+    .card-flipped {
+      transform: rotateY(180deg);
+    }
+    .card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 1.5rem;
+      border-radius: 1.75rem;
+    }
+    .card-back {
+      transform: rotateY(180deg);
+    }
+  </style>
+</head>
+<body class="h-full text-slate-800 flex flex-col select-none overflow-hidden">
+
+  <!-- Hidden Audio Player for Speech -->
+  <audio id="audioPlayer" preload="auto" class="hidden"></audio>
+
+  <!-- ==================== TOP BAR ==================== -->
+  <header class="bg-white/95 backdrop-blur-md border-b border-rose-100/80 px-4 py-2.5 flex items-center justify-between z-20 shrink-0 shadow-sm">
+    <div class="flex items-center space-x-2">
+      <img src="./icon-192.png" alt="Logo" class="w-8 h-8 rounded-xl object-contain shadow-sm border border-amber-300/40">
+      <div>
+        <h1 class="text-sm font-extrabold tracking-tight text-slate-900 flex items-center gap-1">
+          HanyuGo
+          <span class="text-[9px] px-1 py-0.2 rounded-md bg-red-50 text-red-700 font-bold border border-red-200">Cá nhân</span>
+        </h1>
+        <p class="text-[10px] text-slate-400 font-medium" id="headerDeckSubtitle">Tất cả các bộ từ</p>
+      </div>
+    </div>
+
+    <!-- Right: Language Switcher Pill & Quick Sound Test -->
+    <div class="flex items-center gap-2">
+      <div class="bg-slate-100 p-0.5 rounded-full flex border border-slate-200">
+        <button id="btnLangZh" onclick="switchLanguage('zh')" class="px-2.5 py-1 text-xs font-bold rounded-full bg-red-700 text-white shadow-sm transition">
+          🇨🇳 Trung
+        </button>
+        <button id="btnLangEn" onclick="switchLanguage('en')" class="px-2.5 py-1 text-xs font-semibold rounded-full text-slate-500 hover:text-slate-800 transition">
+          🇬🇧 Anh
+        </button>
+      </div>
+
+      <button onclick="testQuickAudio()" class="w-7 h-7 rounded-full bg-rose-50 border border-rose-200 text-red-700 flex items-center justify-center text-xs hover:bg-rose-100 active:scale-95 transition" title="Nghe thử âm thanh">
+        🔊
+      </button>
+    </div>
+  </header>
+
+  <!-- ==================== DECK SELECTOR BAR ==================== -->
+  <div class="bg-white/80 border-b border-rose-100/60 px-4 py-2 flex items-center justify-between gap-2 z-10 shrink-0">
+    <div class="flex items-center gap-1.5 flex-1 min-w-0">
+      <span class="text-xs text-slate-400 font-semibold shrink-0">📁 Bộ:</span>
+      <select id="deckSelector" onchange="onSelectDeckChange()" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-red-600 truncate flex-1">
+        <option value="all">📂 Tất cả từ vựng</option>
+      </select>
+    </div>
+
+    <button onclick="openCreateDeckModal()" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-bold text-red-700 flex items-center gap-1 shrink-0 active:scale-95 transition">
+      <span>+</span>
+      <span>Tạo bộ mới</span>
+    </button>
+  </div>
+
+  <!-- ==================== MAIN CONTAINER ==================== -->
+  <main class="flex-1 overflow-y-auto pb-24 relative px-4 py-3 max-w-lg mx-auto w-full" id="mainContainer">
+
+    <!-- ==================== TAB: LUYỆN VIẾT & CHI TIẾT CHỮ HÁN ==================== -->
+    <section id="tabWriting" class="space-y-4">
+      
+      <!-- Top Character Info Card -->
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-rose-100/70 text-center relative overflow-hidden">
+        
+        <div class="flex items-center justify-between mb-2">
+          <span class="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full" id="charHskBadge">
+            <svg class="w-3.5 h-3.5 text-rose-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+            <span id="charDeckBadge">HSK 1</span>
+          </span>
+
+          <div class="flex items-center gap-2">
+            <!-- Speaker Button directly on Card -->
+            <button onclick="speakCurrentWord()" class="px-3 py-1 bg-red-700 hover:bg-red-800 text-white rounded-full text-xs font-bold flex items-center gap-1 shadow-sm active:scale-95 transition">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+              <span>Phát âm</span>
+            </button>
+
+            <button onclick="toggleFavoriteCurrent()" id="btnBookmark" class="p-1.5 rounded-full text-slate-400 hover:text-red-600 bg-slate-50 border border-slate-200">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Pinyin & Tone Badge -->
+        <div class="flex items-center justify-center gap-2 mb-1">
+          <span id="charPinyin" class="text-lg font-bold text-slate-800">ài</span>
+          <span id="charToneBadge" class="text-[11px] font-bold text-amber-900 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-md">
+            Thanh 4 (`)
+          </span>
+        </div>
+
+        <!-- Huge Red Hanzi Character -->
+        <div id="charBigDisplay" class="font-hanzi text-7xl sm:text-8xl font-bold text-red-700 my-1 tracking-wider leading-none select-none cursor-pointer" onclick="speakCurrentWord()" title="Chạm để nghe phát âm">
+          爱
+        </div>
+
+        <!-- Meaning & Hán Việt -->
+        <div class="mt-2">
+          <div id="charMeaning" class="text-base font-bold text-slate-800">
+            Yêu, thương, thích thú
+          </div>
+          <div class="text-xs text-slate-500 mt-0.5">
+            Hán Việt: <strong id="charHanViet" class="text-red-700 font-bold text-sm">ÁI</strong>
+          </div>
+        </div>
+
+        <!-- 3 Info Pills -->
+        <div class="grid grid-cols-3 gap-2 mt-4 text-center">
+          <div class="bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+            <div class="text-[10px] text-slate-400 font-semibold mb-0.5">Bộ thủ</div>
+            <div id="charRadical" class="font-bold text-red-700 text-sm font-hanzi">爪 / 爫</div>
+            <div id="charRadicalName" class="text-[9px] text-slate-500">Bộ Trảo (Móng)</div>
+          </div>
+
+          <div class="bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+            <div class="text-[10px] text-slate-400 font-semibold mb-0.5">Số nét</div>
+            <div id="charStrokeCount" class="font-bold text-slate-800 text-sm">10 nét</div>
+            <div class="text-[9px] text-slate-500">Quy tắc chuẩn</div>
+          </div>
+
+          <div class="bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+            <div class="text-[10px] text-slate-400 font-semibold mb-0.5">Thứ tự nét</div>
+            <div id="charStrokeRule" class="font-bold text-red-700 text-xs truncate">Trên ➔ Dưới</div>
+            <div class="text-[9px] text-slate-500">Ngoài vào trong</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ==================== KHUNG LƯỚI Ô CHỮ MỄ (Mǐzìgé) & TỰ VẼ TAY ==================== -->
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-rose-100/70">
+        
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center bg-slate-100 p-0.5 rounded-full border border-slate-200">
+            <button onclick="setWritingMode('model')" id="btnModeModel" class="px-3 py-1 text-xs font-bold rounded-full bg-white text-red-700 shadow-sm transition flex items-center gap-1">
+              <span>▶</span> Xem mẫu
+            </button>
+            <button onclick="setWritingMode('draw')" id="btnModeDraw" class="px-3 py-1 text-xs font-bold rounded-full text-slate-500 hover:text-slate-800 transition flex items-center gap-1">
+              <span>✏️</span> Tự vẽ tay
+            </button>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <button onclick="clearCanvas()" class="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition flex items-center gap-1" title="Xóa vẽ lại">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span>Xóa</span>
+            </button>
+            <button onclick="gradeHandwriting()" class="px-3 py-1 text-xs font-bold rounded-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs transition flex items-center gap-1">
+              <span>🎯</span>
+              <span>Chấm điểm</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="relative w-64 h-64 sm:w-72 sm:h-72 mx-auto bg-white rounded-2xl border-2 border-red-200 shadow-inner overflow-hidden flex items-center justify-center">
+          <svg class="absolute inset-0 w-full h-full pointer-events-none stroke-red-200" stroke-width="1" stroke-dasharray="4,4">
+            <line x1="50%" y1="0" x2="50%" y2="100%"/>
+            <line x1="0" y1="50%" x2="100%" y2="50%"/>
+            <line x1="0" y1="0" x2="100%" y2="100%"/>
+            <line x1="100%" y1="0" x2="0" y2="100%"/>
+          </svg>
+
+          <div id="canvasWatermark" class="absolute inset-0 flex items-center justify-center font-hanzi text-8xl sm:text-9xl text-red-700/20 pointer-events-none select-none font-bold">
+            爱
+          </div>
+
+          <canvas id="handwritingCanvas" width="288" height="288" class="absolute inset-0 w-full h-full z-10 touch-none cursor-crosshair"></canvas>
+
+          <div class="absolute bottom-2 right-2 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md text-[10px] font-bold text-rose-700 z-15 shadow-2xs">
+            Nét: <span id="strokeProgressBadge">0/10</span>
+          </div>
+        </div>
+
+        <!-- Khung Kết Quả Chấm Điểm Luyện Viết -->
+        <div id="writingScoreCard" class="hidden mt-4 p-4 rounded-3xl border transition-all shadow-sm">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div id="scoreCircle" class="w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-bold text-white shadow-sm shrink-0">
+                <span id="scoreNumber" class="text-xl leading-none">95</span>
+                <span class="text-[9px] font-normal opacity-90">điểm</span>
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h4 id="scoreTitle" class="font-bold text-slate-900 text-sm">Tuyệt phẩm thư pháp!</h4>
+                  <span id="scoreStars" class="text-xs">⭐⭐⭐</span>
+                </div>
+                <p id="scoreDesc" class="text-xs text-slate-600 mt-0.5 leading-snug">Nét bút rất chuẩn xác, đạt 95/100 điểm.</p>
+              </div>
+            </div>
+            <button onclick="hideScoreCard()" class="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg shrink-0">✕</button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-200/60 text-center">
+            <div class="bg-white/80 p-2 rounded-xl border border-slate-100">
+              <div class="text-[10px] text-slate-400 font-medium">Số nét đã viết</div>
+              <div id="scoreStrokes" class="text-xs font-bold text-slate-800">10 / 10 nét</div>
+            </div>
+            <div class="bg-white/80 p-2 rounded-xl border border-slate-100">
+              <div class="text-[10px] text-slate-400 font-medium">Độ chuẩn xác</div>
+              <div id="scoreAccuracy" class="text-xs font-bold text-emerald-700">92%</div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 mt-3">
+            <button onclick="clearCanvas()" class="flex-1 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold rounded-xl text-xs transition">
+              ✍️ Viết lại
+            </button>
+            <button onclick="nextCharacter()" class="flex-1 py-2 bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl text-xs transition shadow-2xs">
+              Chữ sau ➔
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-4 p-3 bg-rose-50/60 rounded-2xl border border-rose-200/70 flex items-start gap-2 text-xs text-slate-700">
+          <span class="text-base text-rose-600 shrink-0">💡</span>
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-rose-800">Câu chuyện & Quy tắc chữ:</span>
+            </div>
+            <p id="charStoryText" class="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+              Viết phẩy trước (爫), rồi đến trùm (冖), tiếp theo tâm (心) và hữu (友). Dùng móng vuốt chở che cho trái tim người bạn/người yêu.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ==================== THỨ TỰ BÚT THUẬN (CÓ THỂ SỬA) ==================== -->
+      <div class="bg-white rounded-3xl p-4 shadow-sm border border-rose-100/70">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-1.5 font-bold text-slate-900 text-xs">
+            <span class="w-2 h-2 rounded-full bg-red-600"></span>
+            <span>Thứ tự các nét bút thuận</span>
+          </div>
+          <button onclick="openEditStrokeModal()" class="text-xs font-bold text-red-700 flex items-center gap-0.5 hover:underline">
+            <span>✏️</span>
+            <span>Chỉnh sửa nét</span>
+          </button>
+        </div>
+
+        <div id="strokeOrderRow" class="flex gap-2 overflow-x-auto no-scrollbar py-1">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- ==================== PHÁT ÂM CHUẨN & ĐA CẤP TỐC ĐỘ ==================== -->
+      <div class="bg-white rounded-3xl p-4 shadow-sm border border-rose-100/70 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+            <span>🔊</span> Phát âm & Tốc độ đọc
+          </span>
+          <span class="text-[10px] text-red-700 font-bold bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+            Giọng chuẩn bản xứ
+          </span>
+        </div>
+
+        <!-- Thanh chọn nhiều nấc tốc độ -->
+        <div class="flex items-center justify-between bg-slate-50 p-1.5 rounded-2xl border border-slate-200/80">
+          <span class="text-[11px] font-bold text-slate-500 pl-2">Tốc độ:</span>
+          <div class="flex gap-1.5" id="speedPillsContainer">
+            <button onclick="setAudioPlaybackSpeed(0.5, this)" class="speed-pill px-2.5 py-1 text-xs font-bold rounded-xl text-slate-600 hover:bg-white transition">0.5x</button>
+            <button onclick="setAudioPlaybackSpeed(0.75, this)" class="speed-pill px-2.5 py-1 text-xs font-bold rounded-xl text-slate-600 hover:bg-white transition">0.75x</button>
+            <button onclick="setAudioPlaybackSpeed(1.0, this)" class="speed-pill active px-3 py-1 text-xs font-bold rounded-xl bg-red-700 text-white shadow-2xs transition">1.0x</button>
+            <button onclick="setAudioPlaybackSpeed(1.25, this)" class="speed-pill px-2.5 py-1 text-xs font-bold rounded-xl text-slate-600 hover:bg-white transition">1.25x</button>
+          </div>
+        </div>
+
+        <!-- Nút phát âm chính -->
+        <button onclick="speakCurrentWord()" class="w-full py-3 bg-red-700 hover:bg-red-800 active:scale-95 text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+          <span>Nghe phát âm từ này (<span id="currentSpeedLabel">1.0x</span>)</span>
+        </button>
+      </div>
+
+      <!-- ==================== CÂU VÍ DỤ THỰC TẾ (COLLOCATION) ==================== -->
+      <div class="bg-white rounded-3xl p-4 shadow-sm border border-rose-100/70">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold text-slate-900 flex items-center gap-1">
+            📖 Câu ví dụ thực tế (Collocation)
+          </span>
+          <span class="text-[10px] text-slate-400">Bấm loa để nghe phát âm</span>
+        </div>
+
+        <!-- Box Ví Dụ: Có Loa To Rõ Trong Box -->
+        <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 flex items-center justify-between gap-3">
+          <div class="flex-1 min-w-0">
+            <div id="collocExampleZh" class="font-hanzi text-lg font-bold text-slate-900 leading-snug">
+              我 <span class="text-red-700 underline underline-offset-4 decoration-2">爱</span> 学习汉语
+            </div>
+            <div id="collocExamplePinyin" class="text-xs text-amber-800 font-medium mt-0.5">
+              Wǒ ài xuéxí Hànyǔ
+            </div>
+            <div id="collocExampleVi" class="text-xs text-slate-600 mt-1">
+              Tôi yêu việc học tiếng Trung.
+            </div>
+          </div>
+
+          <!-- LOA TRONG BOX: BẤM PHÁT ÂM NGAY -->
+          <button onclick="speakCollocation()" class="w-12 h-12 rounded-2xl bg-red-700 hover:bg-red-800 active:scale-95 text-white shadow-md shadow-red-700/25 flex items-center justify-center shrink-0 transition" title="Nghe phát âm cả câu">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- ACTION BUTTONS -->
+      <div class="pt-2 flex items-center gap-2">
+        <button onclick="prevCharacter()" class="py-4 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition">
+          ◀ Trước
+        </button>
+        <button onclick="nextCharacter()" class="flex-1 py-4 bg-red-700 hover:bg-red-800 active:scale-98 text-white font-bold rounded-2xl shadow-lg shadow-red-700/25 flex items-center justify-center gap-2 text-sm transition">
+          <span>Từ tiếp theo</span>
+          <span>➔</span>
+        </button>
+      </div>
+
+    </section>
+
+    <!-- ==================== TAB: TRANG CHỦ / ÔN LUYỆN GÕ TỪ (DRILL) ==================== -->
+    <section id="tabHome" class="hidden space-y-4">
+      
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-rose-100/70 text-center space-y-4">
+        
+        <div class="flex items-center justify-between text-xs text-slate-500">
+          <span class="font-bold text-red-700 flex items-center gap-1">
+            <span class="inline-block w-2 h-2 rounded-full bg-red-600"></span>
+            <span id="drillModeTitle">Luyện gõ Pinyin phản xạ</span>
+          </span>
+          <span>Tiến độ: <strong class="text-slate-800" id="drillIndexDisplay">1/10</strong></span>
+        </div>
+
+        <div class="py-2">
+          <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold mb-1">Nghĩa tiếng Việt</div>
+          <div id="homePromptMeaning" class="text-xl sm:text-2xl font-extrabold text-slate-900 leading-snug">
+            --
+          </div>
+          
+          <div id="homeChinesePreview" onclick="speakCurrentDrillWord()" class="mt-3 p-3 bg-rose-50/80 hover:bg-rose-100 rounded-2xl border border-rose-200 inline-block px-6 cursor-pointer active:scale-95 transition" title="Chạm để nghe phát âm">
+            <span class="text-xs text-slate-500 block mb-0.5">Chữ Hán (Chạm để nghe):</span>
+            <span id="homeChineseChar" class="font-hanzi text-5xl font-bold text-red-700">--</span>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <div class="relative">
+            <input 
+              type="text" 
+              id="homeDrillInput" 
+              autocomplete="off" 
+              autocorrect="off" 
+              autocapitalize="off" 
+              spellcheck="false"
+              placeholder="Nhập..." 
+              class="w-full bg-slate-50 border-2 border-slate-200 focus:border-red-600 rounded-2xl px-4 py-3.5 text-base font-bold text-slate-800 placeholder-slate-400 focus:outline-none transition"
+              onkeydown="if(event.key === 'Enter') checkHomeDrillAnswer()"
+            />
+            <button 
+              onclick="checkHomeDrillAnswer()"
+              class="absolute right-2 top-2 bottom-2 px-4 bg-red-700 hover:bg-red-800 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center gap-1 shadow-sm transition"
+            >
+              Kiểm tra ➔
+            </button>
+          </div>
+
+          <p id="homeInputHelper" class="text-[11px] text-slate-500">
+            Gõ Pinyin (hỗ trợ có dấu, có số hoặc viết liền) rồi nhấn Enter.
+          </p>
+
+          <div id="homeDrillFeedback" class="hidden p-3 rounded-2xl text-xs font-bold"></div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+          <button onclick="skipHomeDrill()" class="text-slate-400 hover:text-slate-700 font-medium">Bỏ qua ⏭</button>
+          <button onclick="speakCurrentDrillWord()" class="px-3 py-1.5 rounded-xl bg-red-700 text-white hover:bg-red-800 font-bold flex items-center gap-1 shadow-sm active:scale-95 transition">
+            <span>🔊</span>
+            <span>Nghe phát âm</span>
+          </button>
+          <button onclick="nextHomeDrill()" class="text-red-700 hover:text-red-800 font-bold">Từ sau ➔</button>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ==================== TAB: FLASHCARD (LẬT THẺ 3D) ==================== -->
+    <section id="tabFlashcard" class="hidden space-y-4">
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-rose-100/70 text-center space-y-4">
+        
+        <div class="flex items-center justify-between text-xs text-slate-500">
+          <span class="font-bold text-red-700 flex items-center gap-1">
+            <span>🗂️</span>
+            <span>Flashcard 3D</span>
+          </span>
+          <span>Thẻ: <strong class="text-slate-800" id="cardProgress">1/10</strong></span>
+        </div>
+
+        <!-- 3D Card Container -->
+        <div class="perspective-1000 w-full h-80 sm:h-96 cursor-pointer" onclick="flipFlashcard()">
+          <div id="flashcardInner" class="card-inner">
+            <!-- Mặt trước: Từ vựng + Phát âm -->
+            <div class="card-face bg-gradient-to-br from-white via-white to-rose-50/40 border-2 border-rose-100 shadow-md text-center">
+              <span class="text-xs font-bold text-red-700 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full mb-3" id="cardBadge">🇨🇳 Tiếng Trung</span>
+              
+              <div id="cardFrontText" class="font-hanzi text-6xl sm:text-7xl font-bold text-red-700 tracking-wide my-2 leading-none">
+                爱
+              </div>
+
+              <div id="cardPhonetic" class="text-base sm:text-lg text-amber-800 font-bold mb-3">
+                ài
+              </div>
+
+              <p class="text-[11px] text-slate-400 mt-6">Chạm vào thẻ để lật xem nghĩa tiếng Việt</p>
+            </div>
+
+            <!-- Mặt sau: Nghĩa tiếng Việt + Ví dụ -->
+            <div class="card-face card-back bg-gradient-to-br from-white via-rose-50/30 to-rose-100/50 border-2 border-red-200 shadow-md text-center">
+              <span class="text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full mb-2">Nghĩa tiếng Việt</span>
+
+              <div id="cardBackMeaning" class="text-xl sm:text-2xl font-extrabold text-slate-900 mb-3 leading-snug">
+                Yêu, thương, thích thú
+              </div>
+
+              <div class="w-full bg-white p-3.5 rounded-2xl border border-rose-200/80 text-left shadow-2xs">
+                <div class="flex items-center justify-between mb-1.5">
+                  <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ví dụ minh họa:</div>
+                  <button 
+                    onclick="event.stopPropagation(); playFlashcardExampleAudio();" 
+                    class="px-2.5 py-1 bg-red-700 hover:bg-red-800 active:scale-95 text-white rounded-xl text-[11px] font-bold flex items-center gap-1 shadow-2xs transition"
+                    title="Nghe phát âm câu ví dụ này"
+                  >
+                    <span>🔊</span>
+                    <span>Nghe ví dụ</span>
+                  </button>
+                </div>
+                <div id="cardBackExample" class="text-xs sm:text-sm text-slate-800 font-medium leading-relaxed">
+                  我爱学习汉语
+                </div>
+              </div>
+
+              <p class="text-[11px] text-slate-400 mt-4">Chạm để lật lại mặt trước</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+          <button onclick="prevFlashcard()" class="flex-1 py-3 px-3 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-bold rounded-2xl text-xs transition flex items-center justify-center gap-1">
+            <span>◀</span> <span>Trước</span>
+          </button>
+          
+          <button onclick="toggleCardFavorite()" id="btnCardFav" class="p-3 bg-slate-100 hover:bg-rose-50 active:scale-95 text-slate-400 hover:text-red-600 rounded-2xl border border-slate-200 transition">
+            ★
+          </button>
+
+          <button onclick="playFlashcardAudio()" class="px-3.5 py-3 bg-rose-50 hover:bg-rose-100 active:scale-95 text-red-700 rounded-2xl border border-rose-200 transition flex items-center gap-1.5 shadow-2xs" title="Nghe phát âm">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+            <span class="text-xs font-bold">Nghe</span>
+          </button>
+
+          <button onclick="nextFlashcard()" class="flex-1 py-3 px-3 bg-red-700 hover:bg-red-800 active:scale-95 text-white font-bold rounded-2xl text-xs transition flex items-center justify-center gap-1 shadow-sm">
+            <span>Sau</span> <span>▶</span>
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== TAB: TỪ VỰNG ==================== -->
+    <section id="tabVocab" class="hidden space-y-3">
+      <div class="flex items-center gap-2">
+        <div class="relative flex-1">
+          <input 
+            type="text" 
+            id="vocabSearchInput" 
+            oninput="renderVocabList()" 
+            placeholder="Tìm từ, chữ Hán, nghĩa..." 
+            class="w-full bg-white border border-slate-200 rounded-2xl pl-9 pr-3 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-red-600 shadow-2xs"
+          />
+          <svg class="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </div>
+
+        <button onclick="openWordModal()" class="px-3.5 py-2.5 bg-red-700 hover:bg-red-800 active:scale-95 text-white rounded-2xl text-xs font-bold shadow-sm transition shrink-0">
+          + Thêm từ
+        </button>
+      </div>
+
+      <div id="vocabListContainer" class="space-y-2"></div>
+    </section>
+
+    <!-- ==================== TAB: CÁ NHÂN & NHẬP TAB ==================== -->
+    <section id="tabSettings" class="hidden space-y-4">
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-rose-100/70 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+            📥 Nhập Hàng Loạt Bằng 1 Phím Tab
+          </h2>
+          <span class="text-[10px] text-red-700 font-bold bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full" id="importLangLabel">
+            Tiếng Trung
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs">
+          <label class="text-slate-600 font-semibold shrink-0">Lưu vào bộ:</label>
+          <select id="importTargetDeck" class="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-red-700 focus:outline-none flex-1 truncate"></select>
+        </div>
+
+        <!-- Khu vực tải file mẫu & hướng dẫn -->
+        <div class="bg-rose-50/70 p-3 rounded-2xl border border-rose-200/80 flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-rose-900 flex items-center gap-1">
+              <span>📥</span> Tải file mẫu về điện thoại:
+            </span>
+            <span class="text-[10px] text-rose-600 font-semibold">Chuẩn 1 phím Tab</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <a href="./Tu_Vung_Mau_Nhap_Tab.docx" download="Tu_Vung_Mau_Nhap_Tab.docx" class="py-2.5 px-3 bg-white hover:bg-rose-50 text-red-700 font-bold rounded-xl text-xs border border-rose-200 shadow-2xs flex items-center justify-center gap-1.5 transition active:scale-95 text-center">
+              <span>📄</span>
+              <span>Tải file Word (.docx)</span>
+            </a>
+            <a href="./Tu_Vung_Mau_Nhap_Tab.txt" download="Tu_Vung_Mau_Nhap_Tab.txt" class="py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-xs border border-slate-200 shadow-2xs flex items-center justify-center gap-1.5 transition active:scale-95 text-center">
+              <span>📝</span>
+              <span>Tải file Text (.txt)</span>
+            </a>
+          </div>
+
+          <button onclick="fillSampleToImportBox()" class="py-2 px-3 bg-red-100/70 hover:bg-red-100 text-red-800 font-bold rounded-xl text-xs flex items-center justify-center gap-1 transition active:scale-95">
+            <span>⚡</span>
+            <span>Dán thử dữ liệu mẫu vào khung bên dưới</span>
+          </button>
+        </div>
+
+        <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-[11px] font-mono text-slate-700">
+          <div class="text-slate-400 font-sans text-[10px] mb-1">Mẫu cấu trúc Tab:</div>
+          <div id="tabHintDisplay" class="text-red-700">Chữ Hán <span class="text-amber-600">[Tab]</span> Pinyin <span class="text-amber-600">[Tab]</span> Nghĩa <span class="text-amber-600">[Tab]</span> Ví dụ</div>
+        </div>
+
+        <textarea 
+          id="importBox" 
+          rows="5" 
+          placeholder="Dán nội dung từ Word vào đây..." 
+          class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs font-mono text-slate-800 focus:outline-none focus:border-red-600"
+        ></textarea>
+
+        <div class="flex items-center justify-between pt-1">
+          <label class="cursor-pointer text-xs text-red-700 hover:text-red-800 font-bold flex items-center gap-1">
+            📁 Tải file (.txt, .tsv)
+            <input type="file" id="fileImportInput" accept=".txt,.tsv,.csv" class="hidden" onchange="handleFileImport(event)"/>
+          </label>
+          <button onclick="previewTabImport()" class="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-xl text-xs font-bold shadow-sm transition">
+            Xem trước & Nạp ➔
+          </button>
+        </div>
+
+        <div id="tabPreviewArea" class="hidden mt-3 p-3 bg-rose-50 rounded-2xl border border-rose-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-rose-800">Phát hiện: <strong id="tabPreviewCount">0</strong> từ</span>
+            <button onclick="saveTabImport()" class="px-3 py-1 bg-red-700 text-white text-xs font-bold rounded-lg shadow-sm">
+              ✓ Lưu vào bộ đã chọn
+            </button>
+          </div>
+          <div id="tabPreviewList" class="max-h-32 overflow-y-auto space-y-1 text-[11px] text-slate-700 font-mono"></div>
+        </div>
+      </div>
+
+      <!-- Starter Data -->
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-rose-100/70 space-y-2">
+        <h2 class="text-xs font-bold text-slate-900">🎁 Nạp Bộ Từ Mẫu Khởi Đầu</h2>
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button onclick="loadSampleStarter('zh')" class="py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-red-800 font-bold rounded-2xl text-xs border border-rose-200 transition">
+            🇨🇳 Nạp mẫu Tiếng Trung
+          </button>
+          <button onclick="loadSampleStarter('en')" class="py-2.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-800 font-bold rounded-2xl text-xs border border-slate-200 transition">
+            🇬🇧 Nạp mẫu Tiếng Anh
+          </button>
+        </div>
+      </div>
+
+      <!-- Backup -->
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-rose-100/70 space-y-2">
+        <h2 class="text-xs font-bold text-slate-900">💾 Sao Lưu & Khôi Phục Dữ Liệu</h2>
+        <p class="text-[11px] text-slate-500">Dữ liệu lưu 100% trên điện thoại của bạn:</p>
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button onclick="exportBackupData()" class="py-2.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold rounded-2xl text-xs transition">
+            📤 Xuất file dự phòng
+          </button>
+          <label class="cursor-pointer py-2.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold rounded-2xl text-xs transition text-center">
+            📥 Khôi phục file
+            <input type="file" accept=".json" class="hidden" onchange="restoreBackupData(event)"/>
+          </label>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== BOTTOM NAVIGATION ==================== -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-rose-100 px-3 py-2 flex items-center justify-around z-30 shadow-lg">
+    <button onclick="switchTab('writing')" id="navWriting" class="flex-1 flex flex-col items-center text-red-700 font-bold transition">
+      <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+      <span class="text-[10px]">Luyện viết</span>
+    </button>
+
+    <button onclick="switchTab('home')" id="navHome" class="flex-1 flex flex-col items-center text-slate-400 transition">
+      <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+      <span class="text-[10px]">Luyện gõ</span>
+    </button>
+
+    <!-- Tab Flashcard -->
+    <button onclick="switchTab('flashcard')" id="navFlashcard" class="flex-1 flex flex-col items-center text-slate-400 transition">
+      <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+      <span class="text-[10px]">Flashcard</span>
+    </button>
+
+    <button onclick="switchTab('vocab')" id="navVocab" class="flex-1 flex flex-col items-center text-slate-400 transition">
+      <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+      <span class="text-[10px]">Từ vựng</span>
+    </button>
+
+    <button onclick="switchTab('settings')" id="navSettings" class="flex-1 flex flex-col items-center text-slate-400 transition">
+      <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+      <span class="text-[10px]">Cá nhân</span>
+    </button>
+  </nav>
+
+  <!-- ==================== MODAL: CHỈNH SỬA NÉT & CHI TIẾT CHỮ HÁN ==================== -->
+  <div id="editStrokeModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-3">
+    <div class="bg-white rounded-3xl p-5 w-full max-w-md shadow-2xl space-y-3.5 border border-rose-100 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+          <span>✏️</span>
+          <span>Sửa Nét Bút Thuận & Chi Tiết Chữ Hán</span>
+        </h3>
+        <button onclick="closeEditStrokeModal()" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">Chữ Hán:</label>
+          <input type="text" id="editCharWord" readonly class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5 text-base font-hanzi font-bold text-red-700 cursor-not-allowed"/>
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">Âm Hán Việt:</label>
+          <input type="text" id="editCharHanViet" placeholder="Ví dụ: ÁI, HỌC..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-red-600"/>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">Pinyin:</label>
+          <input type="text" id="editCharPinyin" placeholder="Ví dụ: ài, xué..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-red-600"/>
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">Thanh điệu:</label>
+          <input type="text" id="editCharTone" placeholder="Ví dụ: Thanh 4 (`)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-red-600"/>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">Bộ thủ (Kèm tên):</label>
+          <input type="text" id="editCharRadical" placeholder="爪 / 爫 - Bộ Trảo" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-red-600"/>
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">Số nét:</label>
+          <input type="text" id="editCharStrokeCount" placeholder="Ví dụ: 10 nét" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-red-600"/>
+        </div>
+      </div>
+
+      <!-- THỨ TỰ CÁC NÉT BÚT THUẬN -->
+      <div>
+        <label class="block text-[11px] font-bold text-red-700 mb-0.5">
+          Thứ tự các nét bút thuận (Cách nhau bằng dấu phẩy):
+        </label>
+        <textarea id="editCharStrokes" rows="3" placeholder="1. Phẩy, 2. Chấm, 3. Chấm, 4. Phẩy, 5. Chấm..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:border-red-600 leading-relaxed"></textarea>
+        <p class="text-[10px] text-slate-400 mt-0.5">Mỗi nét cách nhau bằng dấu phẩy. Ví dụ: 1. Phẩy, 2. Chấm, 3. Chấm, 4. Phẩy...</p>
+      </div>
+
+      <!-- CÂU CHUYỆN / QUY TẮC NHỚ CHỮ -->
+      <div>
+        <label class="block text-[11px] font-bold text-slate-700 mb-0.5">Câu chuyện & Quy tắc nhớ chữ (Chiết tự):</label>
+        <textarea id="editCharStory" rows="2" placeholder="Nhập quy tắc hoặc câu chuyện chiết tự ghi nhớ..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:border-red-600"></textarea>
+      </div>
+
+      <!-- VÍ DỤ COLLOCATION -->
+      <div class="space-y-1.5">
+        <label class="block text-[11px] font-bold text-slate-700">Câu ví dụ thực tế:</label>
+        <input type="text" id="editCharCollocZh" placeholder="Câu tiếng Trung (ví dụ: 我爱学习汉语)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-red-600"/>
+        <input type="text" id="editCharCollocPinyin" placeholder="Pinyin câu (ví dụ: Wǒ ài xuéxí Hànyǔ)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-red-600"/>
+        <input type="text" id="editCharCollocVi" placeholder="Dịch nghĩa (ví dụ: Tôi yêu việc học tiếng Trung)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-red-600"/>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+        <button onclick="closeEditStrokeModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl">Hủy</button>
+        <button onclick="saveEditStrokeModal()" class="px-5 py-2 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-xl shadow-sm">Lưu thay đổi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: TẠO BỘ TỪ MỚI ==================== -->
+  <div id="deckModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-5 w-full max-w-sm shadow-2xl space-y-3 border border-rose-100">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <h3 class="text-sm font-bold text-slate-900">Tạo Bộ Từ Vựng Mới</h3>
+        <button onclick="closeCreateDeckModal()" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Tên bộ từ (Ví dụ: HSK 1, Du lịch, Công sở...):</label>
+        <input type="text" id="newDeckNameInput" placeholder="Nhập tên bộ từ..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-red-600"/>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+        <button onclick="closeCreateDeckModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl">Hủy</button>
+        <button onclick="saveNewDeck()" class="px-4 py-2 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-xl shadow-sm">Tạo bộ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: THÊM TỪ THỦ CÔNG ==================== -->
+  <div id="wordModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-5 w-full max-w-md shadow-2xl space-y-3 border border-rose-100">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <h3 id="modalHeading" class="text-sm font-bold text-slate-900">Thêm từ vựng mới</h3>
+        <button onclick="closeWordModal()" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+      </div>
+
+      <input type="hidden" id="modalWordId" />
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Thuộc bộ từ:</label>
+        <select id="modalDeckSelect" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-red-700 focus:outline-none focus:border-red-600"></select>
+      </div>
+
+      <div>
+        <label id="modalField1Text" class="block text-xs font-bold text-slate-700 mb-1">Chữ Hán (*):</label>
+        <input type="text" id="modalInputWord" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-red-600"/>
+      </div>
+
+      <div>
+        <label id="modalField2Text" class="block text-xs font-bold text-slate-700 mb-1">Pinyin / Phiên âm:</label>
+        <input type="text" id="modalInputPhonetic" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-red-600"/>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Nghĩa tiếng Việt (*):</label>
+        <input type="text" id="modalInputMeaning" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-red-600"/>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Câu ví dụ (tùy chọn):</label>
+        <textarea id="modalInputExample" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-red-600"></textarea>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+        <button onclick="closeWordModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl">Hủy</button>
+        <button onclick="saveWordModal()" class="px-4 py-2 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-xl shadow-sm">Lưu từ</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

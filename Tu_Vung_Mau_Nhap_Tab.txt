@@ -1,0 +1,23 @@
+# TỪ VỰNG TIẾNG TRUNG MẪU (1 DÒNG 1 TỪ, CÁCH NHAU BẰNG PHÍM TAB)
+朋友	péngyou	bạn bè, người bạn	他是我的好朋友。(Anh ấy là bạn tốt của tôi.)
+工作	gōngzuò	công việc, làm việc	我很喜欢这份工作。(Tôi rất thích công việc này.)
+开心	kāixīn	vui vẻ, hân hoan	今天大家都很开心。(Hôm nay mọi người đều rất vui.)
+学习	xuéxí	học tập, nghiên cứu	学习汉语很有趣。(Học tiếng Trung rất thú vị.)
+谢谢	xièxie	cảm ơn	谢谢你的热情帮助。(Cảm ơn sự nhiệt tình giúp đỡ của bạn.)
+漂亮	piàoliang	xinh đẹp, đẹp đẽ	这里的风景真漂亮。(Phong cảnh ở đây thật là đẹp.)
+时间	shíjiān	thời gian	你有时间和我一起去吗？(Bạn có thời gian đi cùng tôi không?)
+喜欢	xǐhuan	thích thú, yêu thích	我喜欢喝中国茶。(Tôi thích uống trà Trung Quốc.)
+健康	jiànkāng	sức khỏe, khỏe mạnh	祝你身体健康！(Chúc bạn dồi dào sức khỏe!)
+成功	chénggōng	thành công	努力一定会成功。(Nỗ lực nhất định sẽ thành công.)
+
+# TỪ VỰNG TIẾNG ANH MẪU (1 DÒNG 1 TỪ, CÁCH NHAU BẰNG PHÍM TAB)
+resilient	/rɪˈzɪl.jənt/	kiên cường, có khả năng phục hồi nhanh	She is very resilient and never gives up.
+collaborate	/kəˈlæb.ə.reɪt/	hợp tác, cộng tác làm việc	We need to collaborate with each other.
+inspire	/ɪnˈspaɪər/	truyền cảm hứng, khích lệ	His speech will inspire many young minds.
+achieve	/əˈtʃiːv/	đạt được, hoàn thành mục tiêu	Work hard to achieve your biggest dream.
+confidence	/ˈkɒn.fɪ.dəns/	sự tự tin, lòng tin	Regular practice boosts your confidence.
+fluent	/ˈfluː.ənt/	trôi chảy, lưu loát	He wants to speak fluent English soon.
+opportunity	/ˌɒp.əˈtʃuː.nə.ti/	cơ hội, thời cơ tốt	Grab every opportunity to improve yourself.
+challenge	/ˈtʃæl.ɪndʒ/	thử thách, thách thức	Every challenge makes you stronger.
+creativity	/ˌkriː.eɪˈtɪv.ə.ti/	sự sáng tạo, óc sáng tạo	Creativity is essential in problem solving.
+dedication	/ˌded.ɪˈkeɪ.ʃən/	sự tận tâm, sự cống hiến	Success comes from dedication and hard work.
