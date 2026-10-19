@@ -232,7 +232,6 @@ function initData() {
 
   loadLanguage(currentLang);
   initCanvas();
-  checkServerStatus();
 }
 
 function loadLanguage(lang) {
@@ -764,7 +763,7 @@ function playAudioVoice(text, lang = currentLang, rate = 1.0) {
 
   // Chống bấm liên thanh
   const now = Date.now();
-  if (now - lastAudioTapTimestamp < 300) return;
+  if (now - lastAudioTapTimestamp < 250) return;
   lastAudioTapTimestamp = now;
 
   // Dừng âm thanh cũ nếu đang phát
@@ -777,7 +776,6 @@ function playAudioVoice(text, lang = currentLang, rate = 1.0) {
   }
 
   const isZh = (lang === 'zh');
-  const targetLang = isZh ? 'zh-CN' : 'en-US';
 
   // 1. NẾU ĐANG CHẠY TRÊN MÁY TÍNH CÓ PYTHON SERVER: Dùng endpoint /tts
   if (isLocalPythonServerHost() && isServerOnline) {
@@ -788,29 +786,39 @@ function playAudioVoice(text, lang = currentLang, rate = 1.0) {
     player.src = ttsUrl;
     player.onerror = () => {
       isServerOnline = false;
-      speakWithNativeTTS(clean, lang, rate);
+      playOnlineOrNativeVoice(clean, isZh, rate);
     };
     player.play().catch(() => {
-      speakWithNativeTTS(clean, lang, rate);
+      playOnlineOrNativeVoice(clean, isZh, rate);
     });
     return;
   }
 
-  // 2. NẾU ĐANG CHẠY TRÊN GITHUB PAGES / ĐIỆN THOẠI (ONLINE):
-  // Thử phát âm thanh chuẩn Bắc Kinh qua stream Google TTS (chất lượng studio phát thanh)
+  // 2. NẾU TRÊN GITHUB PAGES / ĐIỆN THOẠI DI ĐỘNG:
+  playOnlineOrNativeVoice(clean, isZh, rate);
+}
+
+function playOnlineOrNativeVoice(clean, isZh, rate) {
+  // Khi Online: Sử dụng âm thanh phòng thu phát thanh viên Bắc Kinh (Baidu TTS)
   if (navigator.onLine) {
-    const onlineUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(clean)}&tl=${targetLang}&client=tw-ob`;
+    let audioSrc = '';
+    if (isZh) {
+      // Baidu TTS chuẩn phát thanh Bắc Kinh (đầy đủ âm cuốn lưỡi, chuẩn thanh 1 2 3 4)
+      audioSrc = `https://fanyi.baidu.com/gettts?lan=zh&text=${encodeURIComponent(clean)}&spd=5&source=web`;
+    } else {
+      audioSrc = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(clean)}&tl=en&client=tw-ob`;
+    }
+
     const player = new Audio();
     currentActiveAudioInstance = player;
     player.playbackRate = rate;
 
     let hasAudioStarted = false;
-    // Cứu nguy: nếu mạng lag sau 650ms chưa kêu -> chuyển ngay sang giọng offline Bắc Kinh của máy
     const fallbackTimer = setTimeout(() => {
       if (!hasAudioStarted) {
-        speakWithNativeTTS(clean, lang, rate);
+        speakWithNativeTTS(clean, isZh ? 'zh' : 'en', rate);
       }
-    }, 650);
+    }, 900);
 
     player.onplay = () => {
       hasAudioStarted = true;
@@ -819,25 +827,34 @@ function playAudioVoice(text, lang = currentLang, rate = 1.0) {
 
     player.onerror = () => {
       clearTimeout(fallbackTimer);
-      speakWithNativeTTS(clean, lang, rate);
+      // Nếu Baidu gặp sự cố mạng, thử qua Google Translate zh
+      if (isZh && !player.dataset.retried) {
+        player.dataset.retried = '1';
+        player.src = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(clean)}&tl=zh&client=tw-ob`;
+        player.play().catch(() => speakWithNativeTTS(clean, 'zh', rate));
+      } else {
+        speakWithNativeTTS(clean, isZh ? 'zh' : 'en', rate);
+      }
     };
 
-    player.src = onlineUrl;
-    player.play().catch(() => {
-      clearTimeout(fallbackTimer);
-      speakWithNativeTTS(clean, lang, rate);
-    });
+    player.src = audioSrc;
+    const playPromise = player.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        clearTimeout(fallbackTimer);
+        speakWithNativeTTS(clean, isZh ? 'zh' : 'en', rate);
+      });
+    }
     return;
   }
 
-  // 3. NẾU OFFLINE HOÀN TOÀN (TẮT MẠNG / TẮT MÁY TÍNH):
-  // Dùng trực tiếp bộ máy giọng đọc chuẩn Bắc Kinh offline của điện thoại
-  speakWithNativeTTS(clean, lang, rate);
+  // Khi Offline hoàn toàn: Dùng bộ máy TTS của hệ thống điện thoại
+  speakWithNativeTTS(clean, isZh ? 'zh' : 'en', rate);
 }
 
 function speakCurrentWord() {
   if (filteredWords.length === 0) return;
-  playAudioVoice(filteredWords[currentCharIndex].word, currentLang, currentPlaybackSpeed);
+  playAudioVoice(filteredWords[currentCharIndex].word, currentLang, speechRate || 1.0);
 }
 
 function speakSlowWord() {
