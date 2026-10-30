@@ -72,6 +72,21 @@
 - Hoặc bấm **`[⚡ Dán thử dữ liệu mẫu vào khung bên dưới]`** để trải nghiệm nạp 5 từ mẫu ngay lập tức chỉ với 1 chạm!
 
 ---
+### 6. Hướng dẫn cài đặt âm thanh cho androi 
+- Các bước trên Samsung (giao diện Tiếng Việt):
+- Bước 1: Vào mục Quản lý chung
+- Trong Cài đặt của Samsung, bạn cuộn xuống tìm và bấm vào dòng: 👉 Quản lý chung (General management).
+- Bước 2: Vào phần Văn bản sang giọng nói
+- Tiếp tục bấm vào dòng: 👉 Văn bản sang giọng nói (hoặc ghi là Chuyển văn bản thành giọng nói / Text-to-speech).
+- Bước 3: Chọn công cụ của Google
+- Tại màn hình này:
+
+- Ở dòng Công cụ ưu tiên (Preferred engine): Bạn nên chọn "Dịch vụ giọng nói của Google" (hoặc Google Speech Services) vì giọng Trung của Google chuẩn Bắc Kinh và hay hơn giọng Samsung.
+- Nhấn vào biểu tượng Bánh răng cài đặt (⚙️) nằm ngay bên cạnh dòng đó.
+- Bước 4: Tải gói giọng Tiếng Trung (Trung Quốc)
+- Bấm vào dòng: "Cài đặt dữ liệu giọng nói" (Install voice data).
+- Một danh sách các thứ tiếng sẽ hiện ra ➔ Bạn cuộn xuống tìm chữ: 👉 Tiếng Trung (Trung Quốc) hoặc Chinese (China).
+- Bấm vào biểu tượng Mũi tên tải xuống (⬇️) bên cạnh. (Gói giọng nói này chỉ khoảng 15MB – 20MB, tải trong 5 giây là xong).
 
 ## 📂 TOÀN BỘ CÁC FILE ĐƯỢC GỘP GỌN TRONG THƯ MỤC `lang_app`
 

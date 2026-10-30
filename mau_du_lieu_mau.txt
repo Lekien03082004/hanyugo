@@ -1,0 +1,30 @@
+# ==============================================================================
+# HƯỚNG DẪN SOẠN TỪ VỰNG THEO TAB ĐỂ NẠP HÀNG LOẠT VÀO APP
+# Cách soạn:
+# Mỗi từ một dòng, giữa các mục bấm phím TAB (phím Tab trên bàn phím)
+# Cấu trúc: [Từ/Chữ Hán] <Tab> [Phiên âm/Pinyin] <Tab> [Nghĩa] <Tab> [Ví dụ]
+# ==============================================================================
+
+# --- PHẦN 1: MẪU TIẾNG ANH (Sao chép và dán vào tab "Nhập Tab" khi chọn Tiếng Anh) ---
+appreciate	/əˈpriːʃieɪt/	cảm kích, trân trọng	I really appreciate your support.
+confidence	/ˈkɒnfɪdəns/	sự tự tin, lòng tin	Practice will boost your speaking confidence.
+resilient	/rɪˈzɪliənt/	kiên cường, phục hồi nhanh	He showed resilient spirit during tough times.
+enthusiastic	/ɪnˌθjuːziˈæstɪk/	nhiệt huyết, hào hứng	She is enthusiastic about her new project.
+opportunity	/ˌɒpəˈtjuːnəti/	cơ hội, thời cơ	Don't let this great opportunity slip away.
+perspective	/pəˈspektɪv/	quan điểm, góc nhìn	Try to see it from another perspective.
+fluent	/ˈfluːənt/	lưu loát, trôi chảy	He speaks fluent English and Chinese.
+essential	/ɪˈsenʃl/	thiết yếu, cốt lõi	Good sleep is essential for clear thinking.
+collaborate	/kəˈlæbəreɪt/	hợp tác, phối hợp	We need to collaborate closely with the team.
+determination	/dɪˌtɜːmɪˈneɪʃn/	sự quyết tâm, kiên định	Her determination helped her overcome all barriers.
+
+# --- PHẦN 2: MẪU TIẾNG TRUNG (Sao chép và dán vào tab "Nhập Tab" khi chọn Tiếng Trung) ---
+你好	nǐ hǎo	xin chào	你好，很高兴认识你！
+谢谢	xiè xie	cảm ơn	非常感谢你的热心帮助。
+学习	xué xí	học tập	我每天都花时间学习中文。
+努力	nǔ lì	nỗ lực, cố gắng	只要努力，就没有克服不了的困难。
+朋友	péng you	bạn bè	有朋自远方来，不亦乐乎。
+漂亮	piào liang	xinh đẹp, đẹp đẽ	这座城市夜晚的景色真漂亮。
+成功	chéng gōng	thành công	失败是成功之母。
+明白	míng bai	hiểu rõ, thấu hiểu	老师讲的内容我都明白了。
+欢迎	huān yíng	hoan nghênh, chào đón	热烈欢迎你们来到我们的学校！
+健康	jiàn kāng	sức khỏe, khỏe mạnh	祝你身体健康，万事如意！

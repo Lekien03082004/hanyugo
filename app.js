@@ -325,11 +325,13 @@ function applyDeckFilter() {
   currentCharIndex = 0;
   currentDrillIndex = 0;
   currentCardIndex = 0;
+  currentPronounceIndex = 0;
 
   renderCurrentCharacter();
   renderHomeDrill();
   renderFlashcard();
   renderVocabList();
+  renderPronounceWord();
 }
 
 function openCreateDeckModal() {
@@ -461,10 +463,18 @@ function selectDeckFromManager(deckName) {
 
 // ==================== TAB NAVIGATION ====================
 function switchTab(tabId) {
+  // Dừng mọi mic đang thu nếu rời tab
+  if (currentTab === 'pronounce' && tabId !== 'pronounce') {
+    if (typeof stopPronounceRecording === 'function') stopPronounceRecording();
+    if (typeof stopHardRecording === 'function') stopHardRecording();
+    if (typeof stopFreeRecording === 'function') stopFreeRecording();
+  }
+
   currentTab = tabId;
-  const tabs = ['writing', 'home', 'flashcard', 'vocab', 'settings'];
+  const tabs = ['writing', 'pronounce', 'home', 'flashcard', 'vocab', 'settings'];
   const navIds = {
     writing: 'navWriting',
+    pronounce: 'navPronounce',
     home: 'navHome',
     flashcard: 'navFlashcard',
     vocab: 'navVocab',
@@ -492,6 +502,8 @@ function switchTab(tabId) {
   if (tabId === 'writing') {
     renderCurrentCharacter();
     clearCanvas();
+  } else if (tabId === 'pronounce') {
+    renderPronounceWord();
   } else if (tabId === 'home') {
     renderHomeDrill();
     setTimeout(() => {
@@ -1762,6 +1774,727 @@ function restoreBackupData(e) {
     }
   };
   r.readAsText(file, 'UTF-8');
+}
+
+// ==================== LUYỆN PHÁT ÂM (PRONUNCIATION & PINYIN ENGINE) ====================
+let currentPronounceIndex = 0;
+let pronounceMode = 'word'; // 'word' | 'free'
+let pronounceRecognition = null;
+let isPronounceRecording = false;
+let freeRecognition = null;
+let isFreeRecording = false;
+
+let currentHardGroupIndex = 0;
+let currentHardWordIndex = 0;
+let hardRecognition = null;
+let isHardRecording = false;
+
+const HARD_SOUNDS_DATA = [
+  {
+    id: 'zcs',
+    name: 'z, c, s + ư',
+    title: 'Nhóm 1: z, c, s + i',
+    sub: 'Đọc âm "ư" (dẹt miệng, đầu lưỡi chạm răng dưới)',
+    tip: '💡 Khẩu hình: Hai hàm răng khép nhẹ, khóe miệng kéo dẹt sang hai bên như đang mỉm cười. Đầu lưỡi thẳng dí vào chân răng dưới. Riêng chữ "c" phải BẬT HƠI thật mạnh!',
+    contrast: '⚡ So sánh: zi (tư) vs ci (thư - bật hơi) vs si (xư - xì nhẹ)',
+    words: [
+      { word: '字', phonetic: 'zì', meaning: 'Chữ, ký tự', rule: 'z + i (thanh 4) - Đọc dứt khoát "tứ"' },
+      { word: '紫', phonetic: 'zǐ', meaning: 'Màu tím', rule: 'z + i (thanh 3) - Hạ giọng "tử"' },
+      { word: '自己', phonetic: 'zì jǐ', meaning: 'Tự mình, bản thân', rule: 'zì + jǐ - Luyện ghép z và j' },
+      { word: '次', phonetic: 'cì', meaning: 'Lần, thứ', rule: 'c + i (thanh 4) - BẬT HƠI mạnh "thứ"' },
+      { word: '从', phonetic: 'cóng', meaning: 'Từ (đâu đến)', rule: 'c + ong - Bật hơi "thoóng"' },
+      { word: '四', phonetic: 'sì', meaning: 'Số 4', rule: 's + i (thanh 4) - Đọc "sứ" không uốn lưỡi' },
+      { word: '司机', phonetic: 'sī jī', meaning: 'Tài xế, lái xe', rule: 'sī + jī - Phân biệt s dẹt vs j mặt lưỡi' },
+      { word: '三', phonetic: 'sān', meaning: 'Số 3', rule: 's + an - Dẹt miệng' }
+    ]
+  },
+  {
+    id: 'zhchsh',
+    name: 'zh, ch, sh + ư',
+    title: 'Nhóm 2: zh, ch, sh, r + i',
+    sub: 'Đọc âm "ư" (UỐN LƯỠI lên ngạc trên, miệng tròn hơi)',
+    tip: '💡 Khẩu hình: Cong đầu lưỡi uốn lên vòm họng trên (không chạm hẳn). Không dẹt miệng mà hơi tròn môi. Riêng "ch" phải BẬT HƠI mạnh từ cuống họng. "r" phát âm rung nhẹ gần như chữ "r" tiếng Việt!',
+    contrast: '⚡ So sánh tương phản: si (dẹt miệng) vs shi (uốn lưỡi); zi (thẳng lưỡi) vs zhi (uốn lưỡi)',
+    words: [
+      { word: '是', phonetic: 'shì', meaning: 'Là, đúng vậy', rule: 'sh + i (thanh 4) - Uốn lưỡi đọc "sự / sứt"' },
+      { word: '十', phonetic: 'shí', meaning: 'Số 10', rule: 'sh + i (thanh 2) - Lên giọng "sứ"' },
+      { word: '老师', phonetic: 'lǎo shī', meaning: 'Thầy / Cô giáo', rule: 'shī (thanh 1) - Kéo dài ngang tai' },
+      { word: '吃', phonetic: 'chī', meaning: 'Ăn cơm', rule: 'ch + i (thanh 1) - Uốn lưỡi + BẬT HƠI mạnh' },
+      { word: '出', phonetic: 'chū', meaning: 'Ra ngoài', rule: 'ch + u - Bật hơi mạnh' },
+      { word: '知', phonetic: 'zhī', meaning: 'Biết, tri thức', rule: 'zh + i (thanh 1) - Uốn lưỡi không bật hơi "trư"' },
+      { word: '这', phonetic: 'zhè', meaning: 'Đây, này', rule: 'zh + e - Đọc "trợ"' },
+      { word: '日', phonetic: 'rì', meaning: 'Ngày, mặt trời', rule: 'r + i (thanh 4) - Rung nhẹ uốn lưỡi' },
+      { word: '人', phonetic: 'rén', meaning: 'Người, con người', rule: 'r + en - Uốn lưỡi' }
+    ]
+  },
+  {
+    id: 'jqx',
+    name: 'j, q, x + i',
+    title: 'Nhóm 3: j, q, x + i',
+    sub: 'Đọc âm "i" (áp MẶT LƯỠI lên ngạc cứng)',
+    tip: '💡 Khẩu hình: Mặt trước của lưỡi ép sát lên vòm họng ngạc cứng trên. Tuyệt đối không uốn lưỡi. Riêng "q" là âm khó nhất: bật luồng hơi cực mạnh qua khe mặt lưỡi nghe như "t-xi"!',
+    contrast: '⚡ So sánh: ji (chi) vs qi (bật hơi cực mạnh) vs xi (xi nhẹ)',
+    words: [
+      { word: '鸡', phonetic: 'jī', meaning: 'Con gà', rule: 'j + i (thanh 1) - Mặt lưỡi đọc "chi"' },
+      { word: '几', phonetic: 'jǐ', meaning: 'Mấy, vài', rule: 'j + i (thanh 3) - Hạ giọng "chỉ"' },
+      { word: '今天', phonetic: 'jīn tiān', meaning: 'Hôm nay', rule: 'jīn + tiān' },
+      { word: '七', phonetic: 'qī', meaning: 'Số 7', rule: 'q + i (thanh 1) - BẬT HƠI CỰC MẠNH "t-xii"' },
+      { word: '请', phonetic: 'qǐng', meaning: 'Xin mời', rule: 'q + ing - Bật hơi mạnh' },
+      { word: '去', phonetic: 'qù', meaning: 'Đi', rule: 'q + u (tròn môi ü) - Bật hơi' },
+      { word: '西', phonetic: 'xī', meaning: 'Phía tây', rule: 'x + i (thanh 1) - Mặt lưỡi đọc "xi"' },
+      { word: '洗', phonetic: 'xǐ', meaning: 'Rửa, giặt', rule: 'x + i (thanh 3) - Hạ giọng "xỉ"' },
+      { word: '谢谢', phonetic: 'xiè xie', meaning: 'Cảm ơn', rule: 'xiè + xie - Dứt khoát thanh 4' },
+      { word: '喜欢', phonetic: 'xǐ huan', meaning: 'Thích, yêu thích', rule: 'xǐ + huan' }
+    ]
+  }
+];
+
+function setPronounceMode(mode) {
+  pronounceMode = mode;
+  const btnWord = document.getElementById('btnPronounceModeWord');
+  const btnHard = document.getElementById('btnPronounceModeHard');
+  const btnFree = document.getElementById('btnPronounceModeFree');
+  const viewWord = document.getElementById('pronounceWordView');
+  const viewHard = document.getElementById('pronounceHardView');
+  const viewFree = document.getElementById('pronounceFreeView');
+
+  // Dừng thu âm nếu đang chạy
+  stopPronounceRecording();
+  stopHardRecording();
+  stopFreeRecording();
+
+  const activeBtnClass = "flex-1 py-1.5 rounded-full bg-white text-red-700 shadow-sm transition flex items-center justify-center gap-1 text-[11px] sm:text-xs";
+  const inactiveBtnClass = "flex-1 py-1.5 rounded-full text-slate-500 hover:text-slate-800 transition flex items-center justify-center gap-1 text-[11px] sm:text-xs";
+
+  if (btnWord) btnWord.className = (mode === 'word') ? activeBtnClass : inactiveBtnClass;
+  if (btnHard) btnHard.className = (mode === 'hard') ? activeBtnClass : inactiveBtnClass;
+  if (btnFree) btnFree.className = (mode === 'free') ? activeBtnClass : inactiveBtnClass;
+
+  if (viewWord) viewWord.classList.toggle('hidden', mode !== 'word');
+  if (viewHard) viewHard.classList.toggle('hidden', mode !== 'hard');
+  if (viewFree) viewFree.classList.toggle('hidden', mode !== 'free');
+
+  if (mode === 'word') {
+    renderPronounceWord();
+  } else if (mode === 'hard') {
+    renderHardGroup();
+  }
+}
+
+function selectHardGroup(idx) {
+  currentHardGroupIndex = idx;
+  currentHardWordIndex = 0;
+  stopHardRecording();
+  renderHardGroup();
+}
+
+function renderHardGroup() {
+  const group = HARD_SOUNDS_DATA[currentHardGroupIndex];
+  if (!group) return;
+
+  // Cập nhật 3 nút tab nhóm
+  for (let i = 0; i < 3; i++) {
+    const btn = document.getElementById(`btnHardGroup${i}`);
+    if (btn) {
+      if (i === currentHardGroupIndex) {
+        btn.className = "py-2 px-1 rounded-2xl bg-red-700 text-white font-bold text-xs shadow-sm transition active:scale-95 text-center flex flex-col items-center";
+      } else {
+        btn.className = "py-2 px-1 rounded-2xl bg-white hover:bg-rose-50 border border-slate-200 text-slate-700 font-bold text-xs shadow-2xs transition active:scale-95 text-center flex flex-col items-center";
+      }
+    }
+  }
+
+  // Cập nhật card hướng dẫn khẩu hình
+  const titleEl = document.getElementById('hardGroupTitle');
+  const subEl = document.getElementById('hardGroupSub');
+  const tipEl = document.getElementById('hardGroupTip');
+  const contrastEl = document.getElementById('hardGroupContrast');
+
+  if (titleEl) titleEl.innerHTML = `<span>👄</span> <span>${group.title}</span>`;
+  if (subEl) subEl.textContent = group.sub;
+  if (tipEl) tipEl.textContent = group.tip;
+  if (contrastEl) contrastEl.textContent = group.contrast;
+
+  // Cập nhật từ đang active
+  renderHardActiveWord();
+
+  // Render danh sách từ
+  const grid = document.getElementById('hardWordsGrid');
+  if (grid) {
+    grid.innerHTML = group.words.map((item, wIdx) => {
+      const isSelected = (wIdx === currentHardWordIndex);
+      const activeClass = isSelected ? 'border-red-600 bg-rose-50/60 shadow-xs' : 'border-slate-200 bg-white hover:border-rose-200';
+      return `
+        <div onclick="selectHardWord(${wIdx})" class="flex items-center justify-between p-2.5 rounded-2xl border ${activeClass} transition cursor-pointer active:scale-98">
+          <div class="flex items-center gap-3">
+            <span class="font-hanzi text-2xl font-bold text-red-700 w-8 text-center">${item.word}</span>
+            <div>
+              <div class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <span class="text-amber-600 font-extrabold">${item.phonetic}</span>
+                <span class="text-[10px] text-slate-400 font-normal">(${item.meaning})</span>
+              </div>
+              <div class="text-[10px] text-slate-500">${item.rule}</div>
+            </div>
+          </div>
+          <button onclick="event.stopPropagation(); playAudioVoice('${item.word}', 'zh', 0.85);" class="w-7 h-7 rounded-full bg-rose-100 hover:bg-rose-200 text-red-700 flex items-center justify-center text-xs shadow-2xs active:scale-95 transition" title="Nghe phát âm">
+            🔊
+          </button>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+function selectHardWord(wIdx) {
+  currentHardWordIndex = wIdx;
+  stopHardRecording();
+  renderHardActiveWord();
+  renderHardGroup();
+}
+
+function renderHardActiveWord() {
+  const group = HARD_SOUNDS_DATA[currentHardGroupIndex];
+  if (!group || !group.words[currentHardWordIndex]) return;
+  const item = group.words[currentHardWordIndex];
+
+  const wordEl = document.getElementById('hardActiveWord');
+  const pinyinEl = document.getElementById('hardActivePinyin');
+  const meaningEl = document.getElementById('hardActiveMeaning');
+  const ruleEl = document.getElementById('hardActiveRule');
+  const resultBox = document.getElementById('hardResultBox');
+  const statusEl = document.getElementById('hardStatusText');
+
+  if (wordEl) wordEl.textContent = item.word;
+  if (pinyinEl) pinyinEl.textContent = item.phonetic;
+  if (meaningEl) meaningEl.textContent = item.meaning;
+  if (ruleEl) ruleEl.textContent = item.rule;
+
+  if (resultBox) resultBox.classList.add('hidden');
+  if (statusEl && !isHardRecording) {
+    statusEl.textContent = 'Bấm nút Micro và đọc vào máy';
+    statusEl.className = 'text-[11px] font-semibold text-slate-400';
+  }
+}
+
+function speakHardActiveWord() {
+  const group = HARD_SOUNDS_DATA[currentHardGroupIndex];
+  if (!group || !group.words[currentHardWordIndex]) return;
+  playAudioVoice(group.words[currentHardWordIndex].word, 'zh', 0.85);
+}
+
+function toggleHardRecording() {
+  if (isHardRecording) {
+    stopHardRecording();
+  } else {
+    startHardRecording();
+  }
+}
+
+function startHardRecording() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const statusEl = document.getElementById('hardStatusText');
+  const micBtn = document.getElementById('btnHardMic');
+
+  if (!SpeechRecognition) {
+    alert('Trình duyệt của bạn chưa hỗ trợ nhận diện giọng nói. Vui lòng mở bằng Google Chrome hoặc Microsoft Edge!');
+    return;
+  }
+
+  const group = HARD_SOUNDS_DATA[currentHardGroupIndex];
+  if (!group || !group.words[currentHardWordIndex]) return;
+  const targetItem = group.words[currentHardWordIndex];
+
+  try {
+    hardRecognition = new SpeechRecognition();
+    hardRecognition.lang = 'zh-CN';
+    hardRecognition.continuous = false;
+    hardRecognition.interimResults = false;
+
+    hardRecognition.onstart = () => {
+      isHardRecording = true;
+      if (micBtn) micBtn.classList.add('btn-recording');
+      if (statusEl) {
+        statusEl.textContent = `🔴 Đang nghe... Hãy đọc: "${targetItem.word}" (${targetItem.phonetic})!`;
+        statusEl.className = 'text-[11px] font-bold text-red-600 animate-pulse';
+      }
+    };
+
+    hardRecognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      const result = gradePronunciationMatch(targetItem, transcript);
+      displayHardFeedback(result, targetItem);
+    };
+
+    hardRecognition.onerror = (event) => {
+      console.warn('Hard recognition error:', event.error);
+      stopHardRecording();
+    };
+
+    hardRecognition.onend = () => {
+      stopHardRecording();
+    };
+
+    hardRecognition.start();
+  } catch (err) {
+    console.error('Hard start error:', err);
+    stopHardRecording();
+  }
+}
+
+function stopHardRecording() {
+  isHardRecording = false;
+  const micBtn = document.getElementById('btnHardMic');
+  const statusEl = document.getElementById('hardStatusText');
+
+  if (micBtn) micBtn.classList.remove('btn-recording');
+  if (statusEl && !statusEl.textContent.includes('chuẩn') && !statusEl.textContent.includes('đúng')) {
+    statusEl.textContent = 'Bấm nút Micro và đọc vào máy';
+    statusEl.className = 'text-[11px] font-semibold text-slate-400';
+  }
+
+  if (hardRecognition) {
+    try {
+      hardRecognition.abort();
+    } catch(e) {}
+    hardRecognition = null;
+  }
+}
+
+function displayHardFeedback(result, targetItem) {
+  const box = document.getElementById('hardResultBox');
+  const badge = document.getElementById('hardResultBadge');
+  const scoreEl = document.getElementById('hardResultScore');
+  const heardEl = document.getElementById('hardResultHeard');
+  const pinyinEl = document.getElementById('hardResultPinyin');
+  const statusEl = document.getElementById('hardStatusText');
+
+  if (!box) return;
+  box.classList.remove('hidden');
+
+  if (heardEl) heardEl.textContent = result.spokenHanzi;
+  if (pinyinEl) pinyinEl.textContent = result.spokenPinyin;
+
+  if (result.score >= 85) {
+    box.className = "p-3 rounded-2xl border text-left space-y-1 text-xs bg-emerald-50 border-emerald-200";
+    badge.textContent = "🎉 Chuẩn 100%!";
+    badge.className = "text-emerald-800 font-extrabold";
+    scoreEl.textContent = `${result.score}/100`;
+    scoreEl.className = "text-emerald-700 font-black";
+    if (statusEl) {
+      statusEl.textContent = "✅ Phát âm chính xác âm khó này!";
+      statusEl.className = "text-[11px] font-bold text-emerald-600";
+    }
+  } else if (result.score >= 60) {
+    box.className = "p-3 rounded-2xl border text-left space-y-1 text-xs bg-amber-50 border-amber-200";
+    badge.textContent = "⚠️ Gần được rồi!";
+    badge.className = "text-amber-800 font-extrabold";
+    scoreEl.textContent = `${result.score}/100`;
+    scoreEl.className = "text-amber-700 font-black";
+    if (statusEl) {
+      statusEl.textContent = `Bạn vừa đọc là: "${result.spokenPinyin}". Chú ý khẩu hình môi & lưỡi!`;
+      statusEl.className = "text-[11px] font-bold text-amber-600";
+    }
+  } else {
+    box.className = "p-3 rounded-2xl border text-left space-y-1 text-xs bg-rose-50 border-rose-200";
+    badge.textContent = "❌ Chưa chuẩn!";
+    badge.className = "text-rose-800 font-extrabold";
+    scoreEl.textContent = `${result.score}/100`;
+    scoreEl.className = "text-rose-700 font-black";
+    if (statusEl) {
+      statusEl.textContent = `Máy nghe được là: "${result.spokenHanzi}" (${result.spokenPinyin}). Hãy nghe lại mẫu!`;
+      statusEl.className = "text-[11px] font-bold text-rose-600";
+    }
+  }
+}
+
+function openPronounceForCurrentWord() {
+  currentPronounceIndex = currentCharIndex;
+  switchTab('pronounce');
+  setPronounceMode('word');
+}
+
+function renderPronounceWord() {
+  if (!filteredWords || filteredWords.length === 0) {
+    const targetWordEl = document.getElementById('pronounceTargetWord');
+    if (targetWordEl) targetWordEl.textContent = 'Trống';
+    return;
+  }
+
+  if (currentPronounceIndex >= filteredWords.length) currentPronounceIndex = 0;
+  if (currentPronounceIndex < 0) currentPronounceIndex = filteredWords.length - 1;
+
+  const item = filteredWords[currentPronounceIndex];
+  const targetWordEl = document.getElementById('pronounceTargetWord');
+  const targetPinyinEl = document.getElementById('pronounceTargetPinyin');
+  const targetMeaningEl = document.getElementById('pronounceTargetMeaning');
+  const progressEl = document.getElementById('pronounceProgress');
+  const deckBadgeEl = document.getElementById('pronounceDeckBadge');
+  const feedbackBox = document.getElementById('pronounceFeedbackBox');
+
+  if (targetWordEl) targetWordEl.textContent = item.word;
+  if (targetPinyinEl) targetPinyinEl.textContent = item.phonetic || item.word;
+  if (targetMeaningEl) targetMeaningEl.textContent = item.meaning || '';
+  if (progressEl) progressEl.textContent = `${currentPronounceIndex + 1}/${filteredWords.length}`;
+  if (deckBadgeEl) deckBadgeEl.textContent = item.deck || (currentLang === 'zh' ? 'HSK' : 'Cơ bản');
+
+  // Ẩn kết quả chấm điểm cũ khi chuyển sang từ mới
+  if (feedbackBox) feedbackBox.classList.add('hidden');
+
+  // Đặt lại chữ trạng thái micro
+  const statusEl = document.getElementById('pronounceStatusText');
+  if (statusEl && !isPronounceRecording) {
+    statusEl.textContent = 'Chạm vào Micro để bắt đầu nói';
+    statusEl.className = 'text-xs font-semibold text-slate-400 mt-2';
+  }
+}
+
+function prevPronounceWord() {
+  stopPronounceRecording();
+  if (filteredWords.length === 0) return;
+  currentPronounceIndex = (currentPronounceIndex - 1 + filteredWords.length) % filteredWords.length;
+  renderPronounceWord();
+}
+
+function nextPronounceWord() {
+  stopPronounceRecording();
+  if (filteredWords.length === 0) return;
+  currentPronounceIndex = (currentPronounceIndex + 1) % filteredWords.length;
+  renderPronounceWord();
+}
+
+function randomPronounceWord() {
+  stopPronounceRecording();
+  if (filteredWords.length <= 1) return;
+  let newIdx;
+  do {
+    newIdx = Math.floor(Math.random() * filteredWords.length);
+  } while (newIdx === currentPronounceIndex);
+  currentPronounceIndex = newIdx;
+  renderPronounceWord();
+}
+
+function speakPronounceTarget() {
+  if (filteredWords.length === 0) return;
+  const item = filteredWords[currentPronounceIndex];
+  playAudioVoice(item.word, currentLang, 0.85);
+}
+
+// Chuyển chữ Hán sang Pinyin có dấu thanh điệu
+function convertToPinyin(text) {
+  if (window.pinyinPro && window.pinyinPro.pinyin) {
+    try {
+      return window.pinyinPro.pinyin(text, { toneType: 'symbol' });
+    } catch(e) {
+      return text;
+    }
+  }
+  return text;
+}
+
+// Chuẩn hóa chuỗi để so sánh
+function cleanSpeechString(str) {
+  if (!str) return '';
+  return str.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'，。！？]/g, '')
+    .replace(/\s+/g, '').trim();
+}
+
+// Chấm điểm phát âm
+function gradePronunciationMatch(targetItem, spokenText) {
+  const isZh = (currentLang === 'zh');
+  const spokenClean = cleanSpeechString(spokenText);
+  const targetClean = cleanSpeechString(targetItem.word);
+  const targetPinyinClean = cleanSpeechString(targetItem.phonetic);
+  
+  let spokenPinyin = isZh ? convertToPinyin(spokenText) : spokenText;
+  let spokenPinyinClean = cleanSpeechString(spokenPinyin);
+
+  let score = 0;
+  let isPerfect = false;
+
+  // 1. Khớp hoàn toàn chữ Hán hoặc từ mục tiêu
+  if (spokenClean === targetClean || spokenText.includes(targetItem.word) || targetItem.word.includes(spokenText)) {
+    score = 100;
+    isPerfect = true;
+  }
+  // 2. Khớp Pinyin
+  else if (spokenPinyinClean === targetPinyinClean && targetPinyinClean.length > 0) {
+    if (spokenPinyin.toLowerCase() === (targetItem.phonetic || '').toLowerCase()) {
+      score = 100;
+      isPerfect = true;
+    } else {
+      score = 88; // Đúng âm nhưng thanh điệu hơi lệch
+    }
+  }
+  // 3. Khớp một phần
+  else if (spokenClean.length > 0 && (targetClean.includes(spokenClean) || spokenClean.includes(targetClean))) {
+    score = 75;
+  }
+  else if (spokenPinyinClean.length > 0 && (targetPinyinClean.includes(spokenPinyinClean) || spokenPinyinClean.includes(targetPinyinClean))) {
+    score = 70;
+  }
+  else {
+    // So sánh độ tương đồng
+    let matches = 0;
+    const len = Math.max(targetPinyinClean.length, spokenPinyinClean.length);
+    for (let i = 0; i < Math.min(targetPinyinClean.length, spokenPinyinClean.length); i++) {
+      if (targetPinyinClean[i] === spokenPinyinClean[i]) matches++;
+    }
+    score = len > 0 ? Math.round((matches / len) * 60) : 30;
+  }
+
+  return {
+    score: Math.max(25, Math.min(score, 100)),
+    isPerfect,
+    spokenPinyin,
+    spokenHanzi: spokenText
+  };
+}
+
+function togglePronounceRecording() {
+  if (isPronounceRecording) {
+    stopPronounceRecording();
+  } else {
+    startPronounceRecording();
+  }
+}
+
+function startPronounceRecording() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const statusEl = document.getElementById('pronounceStatusText');
+  const micBtn = document.getElementById('btnPronounceMic');
+
+  if (!SpeechRecognition) {
+    alert('Trình duyệt của bạn chưa hỗ trợ nhận diện giọng nói. Vui lòng mở bằng Google Chrome hoặc Microsoft Edge!');
+    return;
+  }
+
+  if (!filteredWords || filteredWords.length === 0) {
+    alert('Không có từ vựng nào để luyện. Vui lòng thêm từ hoặc chọn bộ từ khác!');
+    return;
+  }
+
+  try {
+    pronounceRecognition = new SpeechRecognition();
+    pronounceRecognition.lang = (currentLang === 'zh') ? 'zh-CN' : 'en-US';
+    pronounceRecognition.continuous = false;
+    pronounceRecognition.interimResults = false;
+
+    pronounceRecognition.onstart = () => {
+      isPronounceRecording = true;
+      if (micBtn) micBtn.classList.add('btn-recording');
+      if (statusEl) {
+        statusEl.textContent = '🔴 Đang lắng nghe... Hãy đọc to từ trên màn hình!';
+        statusEl.className = 'text-xs font-bold text-red-600 mt-2 animate-pulse';
+      }
+    };
+
+    pronounceRecognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      const targetItem = filteredWords[currentPronounceIndex];
+      const result = gradePronunciationMatch(targetItem, transcript);
+      displayPronounceFeedback(result, targetItem);
+    };
+
+    pronounceRecognition.onerror = (event) => {
+      console.warn('Pronounce recognition error:', event.error);
+      if (event.error === 'not-allowed') {
+        alert('Vui lòng cấp quyền sử dụng Micro cho trình duyệt để luyện phát âm!');
+      }
+      stopPronounceRecording();
+    };
+
+    pronounceRecognition.onend = () => {
+      stopPronounceRecording();
+    };
+
+    pronounceRecognition.start();
+  } catch (err) {
+    console.error('Recognition start error:', err);
+    stopPronounceRecording();
+  }
+}
+
+function stopPronounceRecording() {
+  isPronounceRecording = false;
+  const micBtn = document.getElementById('btnPronounceMic');
+  const statusEl = document.getElementById('pronounceStatusText');
+
+  if (micBtn) micBtn.classList.remove('btn-recording');
+  if (statusEl && !statusEl.textContent.includes('chuẩn') && !statusEl.textContent.includes('chưa') && !statusEl.textContent.includes('Chưa')) {
+    statusEl.textContent = 'Chạm vào Micro để bắt đầu nói';
+    statusEl.className = 'text-xs font-semibold text-slate-400 mt-2';
+  }
+
+  if (pronounceRecognition) {
+    try {
+      pronounceRecognition.abort();
+    } catch (e) {}
+    pronounceRecognition = null;
+  }
+}
+
+function displayPronounceFeedback(result, targetItem) {
+  const box = document.getElementById('pronounceFeedbackBox');
+  const badge = document.getElementById('pronounceScoreBadge');
+  const num = document.getElementById('pronounceScoreNum');
+  const spokenHanziEl = document.getElementById('pronounceSpokenHanzi');
+  const spokenPinyinEl = document.getElementById('pronounceSpokenPinyin');
+  const tipText = document.getElementById('pronounceTipText');
+  const statusEl = document.getElementById('pronounceStatusText');
+
+  if (!box) return;
+  box.classList.remove('hidden');
+
+  if (spokenHanziEl) spokenHanziEl.textContent = result.spokenHanzi;
+  if (spokenPinyinEl) spokenPinyinEl.textContent = result.spokenPinyin;
+
+  if (result.score >= 85) {
+    box.className = "p-4 rounded-2xl border text-left space-y-2 bg-emerald-50/80 border-emerald-200 transition-all";
+    badge.className = "px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300";
+    badge.textContent = "🎉 Phát âm rất chuẩn!";
+    num.className = "text-sm font-black text-emerald-700";
+    num.textContent = `${result.score} / 100 điểm`;
+    tipText.textContent = "Rất xuất sắc! Âm điệu và thanh chuẩn xác. Hãy bấm 'Sau ▶' để tiếp tục!";
+    if (statusEl) {
+      statusEl.textContent = "✅ Đọc chuẩn xác!";
+      statusEl.className = "text-xs font-bold text-emerald-600 mt-2";
+    }
+  } else if (result.score >= 60) {
+    box.className = "p-4 rounded-2xl border text-left space-y-2 bg-amber-50/80 border-amber-200 transition-all";
+    badge.className = "px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-amber-100 text-amber-800 border border-amber-300";
+    badge.textContent = "⚠️ Gần đúng rồi!";
+    num.className = "text-sm font-black text-amber-700";
+    num.textContent = `${result.score} / 100 điểm`;
+    tipText.textContent = `Bạn vừa phát âm là "${result.spokenPinyin}". Hãy bấm nút "Nghe giọng mẫu" để nghe lại và thử đọc lại lần nữa nhé!`;
+    if (statusEl) {
+      statusEl.textContent = "Cần chỉnh lại một chút!";
+      statusEl.className = "text-xs font-bold text-amber-600 mt-2";
+    }
+  } else {
+    box.className = "p-4 rounded-2xl border text-left space-y-2 bg-rose-50/80 border-rose-200 transition-all";
+    badge.className = "px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-rose-100 text-rose-800 border border-rose-300";
+    badge.textContent = "❌ Chưa chính xác";
+    num.className = "text-sm font-black text-rose-700";
+    num.textContent = `${result.score} / 100 điểm`;
+    tipText.textContent = `Máy nghe được là "${result.spokenHanzi}" (${result.spokenPinyin}). Hãy kiểm tra khẩu hình miệng hoặc nói dứt khoát hơn!`;
+    if (statusEl) {
+      statusEl.textContent = "Hãy thử nói lại!";
+      statusEl.className = "text-xs font-bold text-rose-600 mt-2";
+    }
+  }
+}
+
+// ==================== NÓI TỰ DO (FREE SPEECH TO PINYIN) ====================
+function toggleFreeSpeechRecording() {
+  if (isFreeRecording) {
+    stopFreeRecording();
+  } else {
+    startFreeRecording();
+  }
+}
+
+function startFreeRecording() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const statusEl = document.getElementById('freeStatusText');
+  const micBtn = document.getElementById('btnFreeMic');
+
+  if (!SpeechRecognition) {
+    alert('Trình duyệt của bạn chưa hỗ trợ nhận diện giọng nói. Vui lòng mở bằng Google Chrome hoặc Microsoft Edge!');
+    return;
+  }
+
+  try {
+    freeRecognition = new SpeechRecognition();
+    freeRecognition.lang = (currentLang === 'zh') ? 'zh-CN' : 'en-US';
+    freeRecognition.continuous = true;
+    freeRecognition.interimResults = true;
+
+    freeRecognition.onstart = () => {
+      isFreeRecording = true;
+      if (micBtn) micBtn.classList.add('btn-recording');
+      if (statusEl) {
+        statusEl.textContent = '🔴 Đang lắng nghe... Nói bất kỳ câu nào vào mic!';
+        statusEl.className = 'text-xs font-bold text-red-600 mt-2 animate-pulse';
+      }
+    };
+
+    freeRecognition.onresult = (event) => {
+      let transcript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+
+      if (transcript.trim().length > 0) {
+        const hanziEl = document.getElementById('freeHanziDisplay');
+        const pinyinEl = document.getElementById('freePinyinDisplay');
+        const actionRow = document.getElementById('freeActionRow');
+
+        if (hanziEl) hanziEl.textContent = transcript;
+        if (pinyinEl) {
+          pinyinEl.textContent = (currentLang === 'zh') ? convertToPinyin(transcript) : transcript;
+        }
+        if (actionRow) actionRow.classList.remove('hidden');
+      }
+    };
+
+    freeRecognition.onerror = (event) => {
+      console.warn('Free recognition error:', event.error);
+      if (event.error === 'not-allowed') {
+        alert('Vui lòng cấp quyền sử dụng Micro cho trình duyệt!');
+      }
+      stopFreeRecording();
+    };
+
+    freeRecognition.onend = () => {
+      if (isFreeRecording) {
+        try { freeRecognition.start(); } catch(e) {}
+      } else {
+        stopFreeRecording();
+      }
+    };
+
+    freeRecognition.start();
+  } catch (err) {
+    console.error('Free recognition error:', err);
+    stopFreeRecording();
+  }
+}
+
+function stopFreeRecording() {
+  isFreeRecording = false;
+  const micBtn = document.getElementById('btnFreeMic');
+  const statusEl = document.getElementById('freeStatusText');
+
+  if (micBtn) micBtn.classList.remove('btn-recording');
+  if (statusEl) {
+    statusEl.textContent = 'Đã dừng. Bấm Micro để nói lại';
+    statusEl.className = 'text-xs font-semibold text-slate-400 mt-2';
+  }
+
+  if (freeRecognition) {
+    try {
+      freeRecognition.stop();
+    } catch (e) {}
+    freeRecognition = null;
+  }
+}
+
+function speakFreeSpokenText() {
+  const hanziEl = document.getElementById('freeHanziDisplay');
+  if (!hanziEl || !hanziEl.textContent || hanziEl.textContent === '拼音') return;
+  playAudioVoice(hanziEl.textContent, currentLang, 0.9);
+}
+
+function clearFreeSpeech() {
+  const hanziEl = document.getElementById('freeHanziDisplay');
+  const pinyinEl = document.getElementById('freePinyinDisplay');
+  const actionRow = document.getElementById('freeActionRow');
+
+  if (hanziEl) hanziEl.textContent = '拼音';
+  if (pinyinEl) pinyinEl.textContent = 'pīn yīn';
+  if (actionRow) actionRow.classList.add('hidden');
 }
 
 // ==================== INIT ====================

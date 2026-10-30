@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hanyugo-v16';
+const CACHE_NAME = 'hanyugo-v17';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -6,7 +6,8 @@ const ASSETS_TO_CACHE = [
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
-  'https://cdn.tailwindcss.com'
+  'https://cdn.tailwindcss.com',
+  'https://cdn.jsdelivr.net/npm/pinyin-pro@3.18.5/dist/index.js'
 ];
 
 self.addEventListener('install', (event) => {
